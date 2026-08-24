@@ -1,8 +1,16 @@
 # beatmap-downloader
 
-Batch osu! beatmap downloader. Filter by star rating, mode, status, BPM,
-length, AR, CS, OD, and HP drain through the official osu! API, then pull
-the actual files through a mirror cascade.
+<p align="center"><strong>Batch osu! beatmap downloader</strong></p>
+
+<p align="center">
+<a href="https://github.com/oHaruki/beatmap-downloader/releases/latest"><img src="https://img.shields.io/github/v/release/oHaruki/beatmap-downloader" alt="Latest release"></a>
+<a href="https://github.com/oHaruki/beatmap-downloader/issues"><img src="https://img.shields.io/github/issues/oHaruki/beatmap-downloader" alt="Issues"></a>
+<a href="LICENSE"><img src="https://img.shields.io/github/license/oHaruki/beatmap-downloader" alt="License"></a>
+</p>
+
+Filter by star rating, mode, status, BPM, length, AR, CS, OD, and HP drain
+through the official osu! API, then pull the actual files through a mirror
+cascade.
 
 ## Early build, expect rough edges
 
