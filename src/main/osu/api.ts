@@ -1,6 +1,7 @@
 // osu! API v2 client (client-credentials grant), search/metadata only.
 
 import type { BeatmapsetSummary, SearchFilters } from "@shared/types";
+import { loadConfig } from "../config";
 
 interface TokenCache {
   token: string;
@@ -9,9 +10,24 @@ interface TokenCache {
 
 let cache: TokenCache | null = null;
 
+// Called after credentials are changed in settings, so a token fetched
+// under the old key/secret doesn't linger until it naturally expires.
+export function resetTokenCache(): void {
+  cache = null;
+}
+
+export async function hasApiCredentials(): Promise<boolean> {
+  const config = await loadConfig();
+  return Boolean(
+    (config.osuApiClientId || process.env.OSU_API_CLIENT_ID) &&
+      (config.osuApiClientSecret || process.env.OSU_API_CLIENT_SECRET)
+  );
+}
+
 async function getAccessToken(): Promise<string | null> {
-  const clientId = process.env.OSU_API_CLIENT_ID;
-  const clientSecret = process.env.OSU_API_CLIENT_SECRET;
+  const config = await loadConfig();
+  const clientId = config.osuApiClientId || process.env.OSU_API_CLIENT_ID;
+  const clientSecret = config.osuApiClientSecret || process.env.OSU_API_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
 
   if (cache && cache.expiresAt > Date.now() + 10_000) return cache.token;

@@ -4,6 +4,7 @@ import { FilterForm } from "./components/FilterForm";
 import { ResultsList } from "./components/ResultsList";
 import { DownloadPanel } from "./components/DownloadPanel";
 import { TitleBar } from "./components/TitleBar";
+import { SettingsModal } from "./components/SettingsModal";
 
 const DEFAULT_FILTERS: SearchFilters = {
   query: "",
@@ -44,10 +45,18 @@ export default function App() {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
   const [batchTotal, setBatchTotal] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsFirstRun, setSettingsFirstRun] = useState(false);
 
   useEffect(() => {
-    void window.api.getDefaultOutputFolder().then(setOutputFolder);
-    void window.api.getDefaultSongsFolder().then(setSongsFolder);
+    void window.api.getOutputFolder().then(setOutputFolder);
+    void window.api.getSongsFolder().then(setSongsFolder);
+    void window.api.hasApiCredentials().then((has) => {
+      if (!has) {
+        setSettingsFirstRun(true);
+        setShowSettings(true);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -175,9 +184,34 @@ export default function App() {
     }
   }
 
+  const downloadLabel = downloading
+    ? "Downloading..."
+    : selectedRemaining === 0
+      ? "Download"
+      : selectedRemaining === selected.size
+        ? `Download ${selected.size} selected`
+        : `Download ${selectedRemaining} of ${selected.size}`;
+
   return (
     <div className="app-shell">
-      <TitleBar />
+      <TitleBar
+        onOpenSettings={() => {
+          setSettingsFirstRun(false);
+          setShowSettings(true);
+        }}
+        downloadLabel={downloadLabel}
+        canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
+        onDownload={handleDownload}
+      />
+      {showSettings && (
+        <SettingsModal
+          firstRun={settingsFirstRun}
+          onClose={() => setShowSettings(false)}
+          onSaved={() => {
+            if (searchError) handleSearch();
+          }}
+        />
+      )}
       <div className="status-bar">
         <span className={`status-dot ${statusLine.tone}`} />
         <span>{statusLine.text}</span>
@@ -201,18 +235,6 @@ export default function App() {
             <span className="output-path">{songsFolder ?? "not set"}</span>
           </div>
           {songsFolder && <span className="meta-inline">{installedIds.size} maps detected</span>}
-
-          <button
-            className="primary-button"
-            onClick={handleDownload}
-            disabled={downloading || !outputFolder || selectedRemaining === 0}
-          >
-            {downloading
-              ? "Downloading..."
-              : selectedRemaining === selected.size
-                ? `Download ${selected.size} selected`
-                : `Download ${selectedRemaining} of ${selected.size} (rest already have)`}
-          </button>
         </aside>
 
         <main className="main-panel">

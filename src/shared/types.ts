@@ -64,11 +64,13 @@ export interface DownloadProgressEvent {
 export interface RendererApi {
   searchBeatmapsets: (filters: SearchFilters) => Promise<SearchResult>;
   chooseOutputFolder: () => Promise<string | null>;
-  getDefaultOutputFolder: () => Promise<string>;
+  getOutputFolder: () => Promise<string>;
   getDownloadedIds: (outDir: string) => Promise<number[]>;
-  getDefaultSongsFolder: () => Promise<string | null>;
+  getSongsFolder: () => Promise<string | null>;
   chooseSongsFolder: () => Promise<string | null>;
   getInstalledBeatmapsetIds: (songsFolder: string) => Promise<number[]>;
+  hasApiCredentials: () => Promise<boolean>;
+  setApiCredentials: (clientId: string, clientSecret: string) => Promise<boolean>;
   startDownload: (
     jobs: DownloadJob[],
     outDir: string,

@@ -13,16 +13,21 @@ const api: RendererApi = {
 
   chooseOutputFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-output-folder"),
 
-  getDefaultOutputFolder: (): Promise<string> => ipcRenderer.invoke("get-default-output-folder"),
+  getOutputFolder: (): Promise<string> => ipcRenderer.invoke("get-output-folder"),
 
   getDownloadedIds: (outDir: string): Promise<number[]> => ipcRenderer.invoke("get-downloaded-ids", outDir),
 
-  getDefaultSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("get-default-songs-folder"),
+  getSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("get-songs-folder"),
 
   chooseSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-songs-folder"),
 
   getInstalledBeatmapsetIds: (songsFolder: string): Promise<number[]> =>
     ipcRenderer.invoke("get-installed-beatmapset-ids", songsFolder),
+
+  hasApiCredentials: (): Promise<boolean> => ipcRenderer.invoke("has-api-credentials"),
+
+  setApiCredentials: (clientId: string, clientSecret: string): Promise<boolean> =>
+    ipcRenderer.invoke("set-api-credentials", clientId, clientSecret),
 
   startDownload: (
     jobs: DownloadJob[],

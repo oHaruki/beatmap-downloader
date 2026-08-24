@@ -36,12 +36,8 @@
       "output": "dist"
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": ["zip"],
       "icon": "resources/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
     }
   }
 }

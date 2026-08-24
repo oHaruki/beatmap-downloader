@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { IconClose, IconMaximize, IconMinimize, IconRestore } from "./icons";
+import { IconClose, IconGear, IconMaximize, IconMinimize, IconRestore } from "./icons";
 import iconUrl from "../assets/icon.png";
 
-export function TitleBar() {
+interface Props {
+  onOpenSettings: () => void;
+  downloadLabel: string;
+  canDownload: boolean;
+  onDownload: () => void;
+}
+
+export function TitleBar({ onOpenSettings, downloadLabel, canDownload, onDownload }: Props) {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -16,6 +23,16 @@ export function TitleBar() {
         <img src={iconUrl} alt="" className="titlebar-icon" />
         <span>beatmap-downloader</span>
       </div>
+
+      <div className="titlebar-actions">
+        <button className="titlebar-download" onClick={onDownload} disabled={!canDownload}>
+          {downloadLabel}
+        </button>
+        <button className="titlebar-button" onClick={onOpenSettings} title="Settings">
+          <IconGear />
+        </button>
+      </div>
+
       <div className="titlebar-buttons">
         <button className="titlebar-button" onClick={() => window.api.windowMinimize()}>
           <IconMinimize />

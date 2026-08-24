@@ -20,6 +20,10 @@ export default defineConfig({
     },
   },
   renderer: {
+    // Built HTML is loaded via file://, not served from a root path, so
+    // asset references need to be relative or they resolve to the wrong
+    // place (this was the packaged build's missing title bar icon).
+    base: "./",
     resolve: {
       alias: {
         "@renderer": resolve("src/renderer/src"),

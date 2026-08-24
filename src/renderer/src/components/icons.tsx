@@ -113,3 +113,10 @@ export const IconClose = (p: SVGProps<SVGSVGElement>) => (
     <path d="M2.5 2.5l11 11M13.5 2.5l-11 11" />
   </Base>
 );
+
+export const IconGear = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <circle cx="8" cy="8" r="2.3" />
+    <path d="M8 2.2v1.6M8 12.2v1.6M13.8 8h-1.6M3.8 8H2.2M11.9 4.1l-1.1 1.1M5.2 10.7l-1.1 1.1M11.9 11.9l-1.1-1.1M5.2 5.3L4.1 4.1" />
+  </Base>
+);
