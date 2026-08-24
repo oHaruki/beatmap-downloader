@@ -1,10 +1,13 @@
 import type { BeatmapsetSummary } from "@shared/types";
+import { beatmapsetNameKey } from "@shared/name-key";
 
 interface Props {
   results: BeatmapsetSummary[];
   selected: Set<number>;
   downloadedIds: Set<number>;
   installedIds: Set<number>;
+  /** Normalized names of legacy Songs entries matched by "artist - title". */
+  legacyNames: Set<string>;
   onToggle: (id: number) => void;
   onToggleAll: () => void;
 }
@@ -17,7 +20,15 @@ function starRange(set: BeatmapsetSummary): string {
   return min === max ? `${min}★` : `${min}-${max}★`;
 }
 
-export function ResultsList({ results, selected, downloadedIds, installedIds, onToggle, onToggleAll }: Props) {
+export function ResultsList({
+  results,
+  selected,
+  downloadedIds,
+  installedIds,
+  legacyNames,
+  onToggle,
+  onToggleAll,
+}: Props) {
   if (results.length === 0) {
     return <p className="empty-hint">No results yet. Try a search above.</p>;
   }
@@ -32,7 +43,8 @@ export function ResultsList({ results, selected, downloadedIds, installedIds, on
       </label>
       <div className="results-list">
         {results.map((set) => {
-          const installed = installedIds.has(set.id);
+          const installed =
+            installedIds.has(set.id) || legacyNames.has(beatmapsetNameKey(set.artist, set.title));
           const downloaded = !installed && downloadedIds.has(set.id);
           return (
             <label className={`result-row${installed || downloaded ? " downloaded" : ""}`} key={set.id}>

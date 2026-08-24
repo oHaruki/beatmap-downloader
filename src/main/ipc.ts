@@ -2,7 +2,7 @@ import { BrowserWindow, dialog, ipcMain } from "electron";
 import { promises as fs } from "fs";
 import type { DownloadJob, SearchFilters } from "@shared/types";
 import { searchBeatmapsets, OsuApiError, hasApiCredentials, resetTokenCache } from "./osu/api";
-import { findDefaultSongsFolder, listInstalledBeatmapsetIds } from "./osu/songs-folder";
+import { findDefaultSongsFolder, listInstalledBeatmapsets } from "./osu/songs-folder";
 import { runDownloadQueue } from "./download/queue";
 import { listDownloadedIds } from "./download/manifest";
 import { loadConfig, saveConfig, getDefaultDownloadsFolder } from "./config";
@@ -61,7 +61,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   });
 
   ipcMain.handle("get-installed-beatmapset-ids", (_event, songsFolder: string) =>
-    listInstalledBeatmapsetIds(songsFolder)
+    listInstalledBeatmapsets(songsFolder)
   );
 
   ipcMain.handle("has-api-credentials", () => hasApiCredentials());

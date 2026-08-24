@@ -67,7 +67,9 @@ export async function runDownloadQueue(
           progressPercent: Math.min(100, Math.round((received / total) * 100)),
         });
       });
-      const fileName = `${safeFileName(job.fileName)}.osz`;
+      // Prefix with the beatmapset id (osu!stable's own naming convention)
+      // so these files are recognized as installed by any future Songs scan.
+      const fileName = `${job.beatmapsetId} ${safeFileName(job.fileName)}.osz`;
       const dest = path.join(outDir, fileName);
       await fs.writeFile(dest, data);
       await recordDownload(outDir, job.beatmapsetId, dest);
