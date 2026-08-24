@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   DownloadJob,
   DownloadProgressEvent,
+  InstalledSongsScan,
   RendererApi,
   SearchFilters,
   SearchResult,
@@ -21,7 +22,7 @@ const api: RendererApi = {
 
   chooseSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-songs-folder"),
 
-  getInstalledBeatmapsetIds: (songsFolder: string): Promise<number[]> =>
+  getInstalledBeatmapsetIds: (songsFolder: string): Promise<InstalledSongsScan> =>
     ipcRenderer.invoke("get-installed-beatmapset-ids", songsFolder),
 
   hasApiCredentials: (): Promise<boolean> => ipcRenderer.invoke("has-api-credentials"),

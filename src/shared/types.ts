@@ -59,6 +59,13 @@ export interface DownloadProgressEvent {
   progressPercent?: number | null;
 }
 
+/** Result of scanning an osu!stable Songs folder for installed beatmapsets. */
+export interface InstalledSongsScan {
+  ids: number[];
+  /** Normalized names of legacy entries with no id prefix ("artist title"). */
+  legacyNames: string[];
+}
+
 // Defined here rather than in preload/ so the renderer's Window
 // augmentation doesn't cross a TS project-reference boundary to see it.
 export interface RendererApi {
@@ -68,7 +75,7 @@ export interface RendererApi {
   getDownloadedIds: (outDir: string) => Promise<number[]>;
   getSongsFolder: () => Promise<string | null>;
   chooseSongsFolder: () => Promise<string | null>;
-  getInstalledBeatmapsetIds: (songsFolder: string) => Promise<number[]>;
+  getInstalledBeatmapsetIds: (songsFolder: string) => Promise<InstalledSongsScan>;
   hasApiCredentials: () => Promise<boolean>;
   setApiCredentials: (clientId: string, clientSecret: string) => Promise<boolean>;
   startDownload: (
