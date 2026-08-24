@@ -195,16 +195,15 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <TitleBar
-        onOpenSettings={() => {
-          setSettingsFirstRun(false);
-          setShowSettings(true);
-        }}
-      />
+      <TitleBar />
       <DownloadBar
         label={downloadLabel}
         canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
         onDownload={handleDownload}
+        onOpenSettings={() => {
+          setSettingsFirstRun(false);
+          setShowSettings(true);
+        }}
       />
       {showSettings && (
         <SettingsModal

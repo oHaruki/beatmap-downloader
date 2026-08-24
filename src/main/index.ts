@@ -5,13 +5,21 @@ import { registerIpcHandlers } from "./ipc";
 
 let mainWindow: BrowserWindow | null = null;
 
+// Packaged: out/ ends up nested inside app.asar, one level deeper than in
+// dev, where out/ and resources/ are plain siblings at the project root.
+// process.resourcesPath always points at the real resources/ folder either
+// way (extraResources places icon.png there directly when packaged).
+const iconPath = app.isPackaged
+  ? join(process.resourcesPath, "icon.png")
+  : join(__dirname, "../../resources/icon.png");
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1180,
     height: 780,
     show: false,
     frame: false,
-    icon: join(__dirname, "../../resources/icon.png"),
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,

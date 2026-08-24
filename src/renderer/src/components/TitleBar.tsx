@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
-import { IconClose, IconGear, IconMaximize, IconMinimize, IconRestore } from "./icons";
+import { IconClose, IconMaximize, IconMinimize, IconRestore } from "./icons";
 import iconUrl from "../assets/icon.png";
 
-interface Props {
-  onOpenSettings: () => void;
-}
-
-export function TitleBar({ onOpenSettings }: Props) {
+export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -19,12 +15,6 @@ export function TitleBar({ onOpenSettings }: Props) {
       <div className="titlebar-drag">
         <img src={iconUrl} alt="" className="titlebar-icon" />
         <span>beatmap-downloader</span>
-      </div>
-
-      <div className="titlebar-actions">
-        <button className="titlebar-button" onClick={onOpenSettings} title="Settings">
-          <IconGear />
-        </button>
       </div>
 
       <div className="titlebar-buttons">
