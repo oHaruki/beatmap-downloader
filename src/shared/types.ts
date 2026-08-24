@@ -59,11 +59,14 @@ export interface DownloadProgressEvent {
   progressPercent?: number | null;
 }
 
-/** Result of scanning an osu!stable Songs folder for installed beatmapsets. */
+/** Result of scanning an osu!stable install for installed beatmapsets. */
 export interface InstalledSongsScan {
   ids: number[];
-  /** Normalized names of legacy entries with no id prefix ("artist title"). */
-  legacyNames: string[];
+  /** Which source(s) the ids came from, so a bad count can be traced in the UI. */
+  source: "osu!.db" | "folder names" | "osu!.db + folder names";
+  /** Per-source counts, shown in the Songs folder tooltip. */
+  fromOsuDb: number;
+  fromFolderNames: number;
 }
 
 // Defined here rather than in preload/ so the renderer's Window

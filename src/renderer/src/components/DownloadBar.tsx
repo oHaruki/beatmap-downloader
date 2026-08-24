@@ -1,3 +1,4 @@
+import type { InstalledSongsScan } from "@shared/types";
 import { IconGear } from "./icons";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   songsFolder: string | null;
   onChooseSongsFolder: () => void;
   installedCount: number;
+  installedSource: InstalledSongsScan["source"] | null;
   forceRedownload: boolean;
   onToggleForceRedownload: (value: boolean) => void;
 }
@@ -28,6 +30,7 @@ export function DownloadBar({
   songsFolder,
   onChooseSongsFolder,
   installedCount,
+  installedSource,
   forceRedownload,
   onToggleForceRedownload,
 }: Props) {
@@ -49,7 +52,12 @@ export function DownloadBar({
       <button
         className="toolbar-folder"
         onClick={onChooseSongsFolder}
-        title={songsFolder ?? "Choose your osu! Songs folder so owned maps are skipped"}
+        title={
+          songsFolder
+            ? `${songsFolder}
+${installedCount} sets detected via ${installedSource ?? "..."}`
+            : "Choose your osu! Songs folder so owned maps are skipped"
+        }
       >
         <span className="toolbar-folder-label">osu! Songs</span>
         <span className="toolbar-folder-path">

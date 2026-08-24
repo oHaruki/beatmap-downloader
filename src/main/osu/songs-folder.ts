@@ -1,11 +1,21 @@
-// Reads installed beatmapset ids from an osu!(stable) Songs folder. Each
-// set's folder (or loose .osz file) starts with its beatmapset id; very old
-// downloads predate that convention, so their names are also reported for
-// title-based matching in the renderer.
+// Works out which beatmapsets are installed for osu!(stable), from two
+// independent sources that are unioned because neither is complete alone:
+//
+//   osu!.db      the game's own index. Carries the real BeatmapSetID no
+//                matter what the folder is called, but osu! only rewrites it
+//                on exit, so it lags anything imported in this session.
+//   Songs folder entries named "<id> Artist - Title", bare "<id>", or a
+//                loose "<id>.osz". Sees fresh imports immediately, but is
+//                blind to folders renamed by hand or predating the id
+//                convention.
+//
+// Neither covers lazer, which stores beatmaps content-addressed under a
+// realm index rather than as named folders.
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
-import { normalizeBeatmapsetName } from "@shared/name-key";
+import type { InstalledSongsScan } from "@shared/types";
+import { readOsuDb } from "./osu-db";
 
 // "12345 Artist - Title", "12345", "12345.osz", "12345 - Title". The id must
 // be the whole name or followed by a separator (space/dot); "1234artist"
@@ -13,17 +23,9 @@ import { normalizeBeatmapsetName } from "@shared/name-key";
 const ID_PREFIX = /^(\d+)(?=$|[\s.])/;
 const OSZ_SUFFIX = /\.osz$/i;
 
-export interface InstalledSongsScan {
-  ids: number[];
-  /**
-   * Normalized names of Songs entries with no usable id prefix (legacy,
-   * pre-2013 downloads named "Artist - Title"). The renderer matches these
-   * against search results so old maps are still recognized as owned.
-   */
-  legacyNames: string[];
+function localAppDataDir(): string {
+  return process.env["LOCALAPPDATA"] ?? path.join(os.homedir(), "AppData", "Local");
 }
-
-export const normalizeSongEntryName = normalizeBeatmapsetName;
 
 export function parseStableDirectoryName(name: string): number | null {
   const match = ID_PREFIX.exec(name.trim());
@@ -86,8 +88,7 @@ async function isDirectory(target: string): Promise<boolean> {
 }
 
 export async function findDefaultSongsFolder(): Promise<string | null> {
-  const localAppData = process.env["LOCALAPPDATA"] ?? path.join(os.homedir(), "AppData", "Local");
-  const installRoot = path.join(localAppData, "osu!");
+  const installRoot = path.join(localAppDataDir(), "osu!");
   const defaultSongs = path.join(installRoot, "Songs");
 
   // A custom BeatmapDirectory wins over the default Songs folder, but only
@@ -95,39 +96,68 @@ export async function findDefaultSongsFolder(): Promise<string | null> {
   const override = await readBeatmapDirectoryOverride(installRoot);
   if (override && (await isDirectory(override))) return override;
 
-  const candidates = [defaultSongs];
+  return (await isDirectory(defaultSongs)) ? defaultSongs : null;
+}
+
+// osu!.db lives in the install root, which is NOT reliably the parent of the
+// Songs folder: BeatmapDirectory can point at another drive entirely. Probe
+// the parent (the default layout, and what picking "<install>\Songs" in the
+// folder dialog gives) before the default install location.
+async function findOsuDb(songsFolder: string): Promise<string | null> {
+  const candidates = [
+    path.join(songsFolder, "..", "osu!.db"),
+    path.join(localAppDataDir(), "osu!", "osu!.db"),
+  ];
   for (const candidate of candidates) {
-    if (await isDirectory(candidate)) return candidate;
+    try {
+      if ((await fs.stat(candidate)).isFile()) return candidate;
+    } catch {
+      // try the next candidate
+    }
   }
   return null;
 }
 
-export async function listInstalledBeatmapsets(songsFolder: string): Promise<InstalledSongsScan> {
+async function listIdsFromSongsFolder(songsFolder: string): Promise<number[]> {
   try {
     const entries = await fs.readdir(songsFolder, { withFileTypes: true });
     const ids = new Set<number>();
-    const legacyNames: string[] = [];
-
     for (const entry of entries) {
-      const isDir = entry.isDirectory();
       // Loose .osz archives count as installed too, not just extracted folders.
       const isOsz = entry.isFile() && OSZ_SUFFIX.test(entry.name);
-      if (!isDir && !isOsz) continue;
+      if (!entry.isDirectory() && !isOsz) continue;
 
       const id = parseStableDirectoryName(entry.name);
-      if (id !== null) {
-        ids.add(id);
-        continue;
-      }
-      const bare = isOsz ? entry.name.replace(OSZ_SUFFIX, "") : entry.name;
-      const normalized = normalizeSongEntryName(bare);
-      if (normalized) legacyNames.push(normalized);
+      if (id !== null) ids.add(id);
     }
-
-    return { ids: [...ids].sort((left, right) => left - right), legacyNames };
+    return [...ids];
   } catch {
     // Missing/unreadable Songs folder counts as nothing installed; the UI
     // lets the user point at the right folder manually.
-    return { ids: [], legacyNames: [] };
+    return [];
   }
+}
+
+export async function listInstalledBeatmapsets(songsFolder: string): Promise<InstalledSongsScan> {
+  const osuDbPath = await findOsuDb(songsFolder);
+  const [osuDb, folderIds] = await Promise.all([
+    osuDbPath ? readOsuDb(osuDbPath) : Promise.resolve(null),
+    listIdsFromSongsFolder(songsFolder),
+  ]);
+
+  const ids = new Set<number>(folderIds);
+  for (const id of osuDb?.setIds ?? []) ids.add(id);
+
+  const source = osuDb
+    ? osuDb.setIds.length >= ids.size
+      ? "osu!.db"
+      : "osu!.db + folder names"
+    : "folder names";
+
+  return {
+    ids: [...ids].sort((left, right) => left - right),
+    source,
+    fromOsuDb: osuDb?.setIds.length ?? 0,
+    fromFolderNames: new Set(folderIds).size,
+  };
 }

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   BeatmapsetSummary,
   DownloadProgressEvent,
+  InstalledSongsScan,
   SearchFilters,
 } from "@shared/types";
-import { beatmapsetNameKey } from "@shared/name-key";
 import { FilterForm } from "./components/FilterForm";
 import { ResultsList } from "./components/ResultsList";
 import { DownloadPanel } from "./components/DownloadPanel";
@@ -42,13 +42,13 @@ export default function App() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [pagesFetched, setPagesFetched] = useState(0);
   const cancelSearchRef = useRef(false);
+  const installedScanRef = useRef(false);
 
   const [outputFolder, setOutputFolder] = useState<string | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<number>>(new Set());
   const [songsFolder, setSongsFolder] = useState<string | null>(null);
   const [installedIds, setInstalledIds] = useState<Set<number>>(new Set());
-  // Legacy Songs entries ("Artist - Title", no id prefix) matched by name.
-  const [legacyNames, setLegacyNames] = useState<Set<string>>(new Set());
+  const [installedSource, setInstalledSource] = useState<InstalledSongsScan["source"] | null>(null);
   const [forceRedownload, setForceRedownload] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
@@ -74,25 +74,36 @@ export default function App() {
 
   useEffect(() => {
     if (!songsFolder) return;
-    void window.api
-      .getInstalledBeatmapsetIds(songsFolder)
-      .then((scan) => {
-        setInstalledIds(new Set(scan.ids));
-        setLegacyNames(new Set(scan.legacyNames));
-      });
+    void refreshInstalledIds(songsFolder);
   }, [songsFolder]);
 
-  // A result counts as owned when its beatmapset id was seen in the Songs
-  // folder, or when its "artist - title" matches a legacy entry that predates
-  // osu!'s id-prefixed naming convention.
-  function isOwned(set: BeatmapsetSummary): boolean {
-    return installedIds.has(set.id) || legacyNames.has(beatmapsetNameKey(set.artist, set.title));
-  }
+  // osu! only rewrites osu!.db when it exits, and a map imported while it is
+  // still running shows up as nothing but a folder. Re-scanning on focus
+  // means coming back from osu! after an import is enough to pick it up,
+  // instead of needing a restart.
+  useEffect(() => {
+    if (!songsFolder) return;
+    const onFocus = (): void => void refreshInstalledIds(songsFolder);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [songsFolder]);
 
   useEffect(() => window.api.onDownloadProgress((event) => {
     setProgress((prev) => new Map(prev).set(event.beatmapsetId, event));
     if (event.status === "done" && outputFolder) void refreshDownloadedIds(outputFolder);
   }), [outputFolder]);
+
+  async function refreshInstalledIds(folder: string): Promise<void> {
+    if (installedScanRef.current) return; // a scan is already in flight
+    installedScanRef.current = true;
+    try {
+      const scan = await window.api.getInstalledBeatmapsetIds(folder);
+      setInstalledIds(new Set(scan.ids));
+      setInstalledSource(scan.source);
+    } finally {
+      installedScanRef.current = false;
+    }
+  }
 
   async function refreshDownloadedIds(folder: string): Promise<void> {
     const ids = await window.api.getDownloadedIds(folder);
@@ -111,14 +122,11 @@ export default function App() {
   }, [results]);
 
   const remainingInResults = results.filter(
-    (set) => !isOwned(set) && !downloadedIds.has(set.id)
+    (set) => !installedIds.has(set.id) && !downloadedIds.has(set.id)
   ).length;
   const selectedRemaining = forceRedownload
     ? selected.size
-    : [...selected].filter((id) => {
-        const set = results.find((candidate) => candidate.id === id);
-        return set ? !isOwned(set) && !downloadedIds.has(id) : true;
-      }).length;
+    : [...selected].filter((id) => !installedIds.has(id) && !downloadedIds.has(id)).length;
 
   const activeDownloads = [...progress.values()].filter((e) => e.status === "downloading").length;
   const statusLine = activeDownloads > 0
@@ -201,7 +209,7 @@ export default function App() {
     // already-owned maps never show up as "downloading" in the first place.
     const toDownload = forceRedownload
       ? selectedSets
-      : selectedSets.filter((set) => !isOwned(set) && !downloadedIds.has(set.id));
+      : selectedSets.filter((set) => !installedIds.has(set.id) && !downloadedIds.has(set.id));
 
     setBatchTotal(toDownload.length);
     const jobs = toDownload.map((set) => ({
@@ -252,6 +260,7 @@ export default function App() {
         songsFolder={songsFolder}
         onChooseSongsFolder={handleChooseSongsFolder}
         installedCount={installedIds.size}
+        installedSource={installedSource}
         forceRedownload={forceRedownload}
         onToggleForceRedownload={setForceRedownload}
       />
@@ -282,7 +291,6 @@ export default function App() {
             selected={selected}
             downloadedIds={downloadedIds}
             installedIds={installedIds}
-            legacyNames={legacyNames}
             onToggle={toggleSelected}
             onToggleAll={toggleSelectAll}
           />
