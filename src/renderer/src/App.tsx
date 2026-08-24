@@ -4,6 +4,7 @@ import { FilterForm } from "./components/FilterForm";
 import { ResultsList } from "./components/ResultsList";
 import { DownloadPanel } from "./components/DownloadPanel";
 import { TitleBar } from "./components/TitleBar";
+import { DownloadBar } from "./components/DownloadBar";
 import { SettingsModal } from "./components/SettingsModal";
 
 const DEFAULT_FILTERS: SearchFilters = {
@@ -199,7 +200,9 @@ export default function App() {
           setSettingsFirstRun(false);
           setShowSettings(true);
         }}
-        downloadLabel={downloadLabel}
+      />
+      <DownloadBar
+        label={downloadLabel}
         canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
         onDownload={handleDownload}
       />

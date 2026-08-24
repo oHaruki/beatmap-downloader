@@ -4,12 +4,9 @@ import iconUrl from "../assets/icon.png";
 
 interface Props {
   onOpenSettings: () => void;
-  downloadLabel: string;
-  canDownload: boolean;
-  onDownload: () => void;
 }
 
-export function TitleBar({ onOpenSettings, downloadLabel, canDownload, onDownload }: Props) {
+export function TitleBar({ onOpenSettings }: Props) {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -25,9 +22,6 @@ export function TitleBar({ onOpenSettings, downloadLabel, canDownload, onDownloa
       </div>
 
       <div className="titlebar-actions">
-        <button className="titlebar-download" onClick={onDownload} disabled={!canDownload}>
-          {downloadLabel}
-        </button>
         <button className="titlebar-button" onClick={onOpenSettings} title="Settings">
           <IconGear />
         </button>

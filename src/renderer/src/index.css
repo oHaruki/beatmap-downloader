@@ -103,15 +103,24 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.titlebar-download {
+.download-bar {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.download-bar-button {
+  width: 100%;
   background: var(--accent);
   border: 1px solid var(--accent);
   color: var(--accent-text);
-  font-size: 12px;
-  padding: 5px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 14px;
 }
 
-.titlebar-download:hover:not(:disabled) {
+.download-bar-button:hover:not(:disabled) {
   background: #6d5cf0;
 }
 

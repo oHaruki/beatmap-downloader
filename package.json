@@ -32,6 +32,7 @@
     "appId": "sh.haruki.beatmap-downloader",
     "productName": "beatmap-downloader",
     "files": ["out/**/*"],
+    "extraResources": [{ "from": "resources/icon.png", "to": "icon.png" }],
     "directories": {
       "output": "dist"
     },
