@@ -106,13 +106,12 @@ body {
 }
 
 .download-bar-button {
-  flex: 1;
   background: var(--accent);
   border: 1px solid var(--accent);
   color: var(--accent-text);
   font-size: 13px;
   font-weight: 500;
-  padding: 8px 14px;
+  padding: 8px 18px;
 }
 
 .download-bar-button:hover:not(:disabled) {
@@ -121,6 +120,7 @@ body {
 
 .download-bar-settings {
   flex-shrink: 0;
+  margin-left: auto;
   width: 32px;
   height: 32px;
   display: flex;

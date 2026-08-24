@@ -196,15 +196,6 @@ export default function App() {
   return (
     <div className="app-shell">
       <TitleBar />
-      <DownloadBar
-        label={downloadLabel}
-        canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
-        onDownload={handleDownload}
-        onOpenSettings={() => {
-          setSettingsFirstRun(false);
-          setShowSettings(true);
-        }}
-      />
       {showSettings && (
         <SettingsModal
           firstRun={settingsFirstRun}
@@ -218,6 +209,15 @@ export default function App() {
         <span className={`status-dot ${statusLine.tone}`} />
         <span>{statusLine.text}</span>
       </div>
+      <DownloadBar
+        label={downloadLabel}
+        canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
+        onDownload={handleDownload}
+        onOpenSettings={() => {
+          setSettingsFirstRun(false);
+          setShowSettings(true);
+        }}
+      />
 
       <div className="app-body">
         <aside className="sidebar">
