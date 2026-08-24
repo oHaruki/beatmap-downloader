@@ -57,9 +57,14 @@ window if you prefer.
 - The actual `.osz` files come from a mirror cascade (Nekoha, then Nerinyan,
   then Beatconnect), since osu.ppy.sh requires a real logged-in session for
   direct downloads.
-- Maps you already have, either downloaded through this app before or
-  already sitting in your osu! Songs folder, are detected and skipped
-  automatically.
+- Maps you already have are detected and skipped automatically. Ownership
+  is read from `osu!.db` (osu!'s own index, which knows the real beatmapset
+  id no matter what a folder is named) unioned with a scan of the Songs
+  folder itself, plus anything downloaded through this app before. osu! only
+  rewrites `osu!.db` when it exits, so the Songs folder is rescanned
+  whenever the window regains focus — import in osu!, alt-tab back, done.
+  Lazer is not covered; it stores beatmaps content-addressed rather than as
+  named folders.
 
 ## Downloading through your own account (WIP)
 

@@ -1,6 +1,6 @@
 {
   "name": "beatmap-downloader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Batch osu! beatmap downloader. Filter by star rating, mode, and status via the official API, download the actual files via a mirror cascade.",
   "main": "./out/main/index.js",
   "author": "Haruki",
@@ -31,13 +31,22 @@
   "build": {
     "appId": "sh.haruki.beatmap-downloader",
     "productName": "beatmap-downloader",
-    "files": ["out/**/*"],
-    "extraResources": [{ "from": "resources/icon.png", "to": "icon.png" }],
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "directories": {
       "output": "dist"
     },
     "win": {
-      "target": ["zip"],
+      "target": [
+        "zip"
+      ],
       "icon": "resources/icon.ico"
     }
   }
