@@ -122,6 +122,14 @@ export default function App() {
           return;
         }
         setResults((prev) => [...prev, ...result.beatmapsets]);
+        // Everything a search turns up is selected by default, since that's
+        // almost always what you want after filtering; unwanted maps get
+        // unticked individually or cleared with "Deselect all".
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const set of result.beatmapsets) next.add(set.id);
+          return next;
+        });
         page += 1;
         setPagesFetched(page);
 
@@ -217,26 +225,18 @@ export default function App() {
           setSettingsFirstRun(false);
           setShowSettings(true);
         }}
+        outputFolder={outputFolder}
+        onChooseOutputFolder={handleChooseFolder}
+        songsFolder={songsFolder}
+        onChooseSongsFolder={handleChooseSongsFolder}
+        installedCount={installedIds.size}
+        forceRedownload={forceRedownload}
+        onToggleForceRedownload={setForceRedownload}
       />
 
       <div className="app-body">
         <aside className="sidebar">
           <FilterForm filters={filters} onChange={setFilters} onSearch={handleSearch} loading={searchLoading} />
-
-          <div className="output-row">
-            <button onClick={handleChooseFolder}>Output folder</button>
-            <span className="output-path">{outputFolder ?? "loading..."}</span>
-          </div>
-          <label className="force-redownload">
-            <input type="checkbox" checked={forceRedownload} onChange={(e) => setForceRedownload(e.target.checked)} />
-            re-download already-downloaded
-          </label>
-
-          <div className="output-row">
-            <button onClick={handleChooseSongsFolder}>osu! Songs folder</button>
-            <span className="output-path">{songsFolder ?? "not set"}</span>
-          </div>
-          {songsFolder && <span className="meta-inline">{installedIds.size} maps detected</span>}
         </aside>
 
         <main className="main-panel">
