@@ -42,45 +42,34 @@ body {
 input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
   margin: 0;
-  flex: 0 0 13px;
-  display: grid;
-  place-content: center;
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  background: var(--panel-alt);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--panel);
+  accent-color: var(--accent);
   cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
-}
-
-input[type="checkbox"]::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  background: #fff;
-  clip-path: polygon(14% 44%, 0 59%, 39% 100%, 100% 23%, 84% 9%, 37% 69%);
-  transform: scale(0);
-  transition: transform 0.1s ease;
-}
-
-input[type="checkbox"]:checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-input[type="checkbox"]:checked::before {
-  transform: scale(1);
 }
 
 input[type="checkbox"]:hover:not(:disabled) {
-  border-color: #a89eff;
+  border-color: var(--accent);
 }
 
 input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--accent-dim);
-  outline-offset: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5 4.7 9 10 3.5' fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 10px 10px;
 }
 
 input[type="checkbox"]:disabled {
