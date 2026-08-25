@@ -11,6 +11,9 @@ import { DownloadPanel } from "./components/DownloadPanel";
 import { TitleBar } from "./components/TitleBar";
 import { DownloadBar } from "./components/DownloadBar";
 import { SettingsModal } from "./components/SettingsModal";
+import { OwnershipFilterBar } from "./components/OwnershipFilterBar";
+import type { ResultsOwnershipFilter } from "./results-filter";
+import { applyResultsFilter, retainVisibleSelections } from "./results-filter";
 
 const DEFAULT_FILTERS: SearchFilters = {
   query: "",
@@ -53,6 +56,8 @@ export default function App() {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
   const [batchTotal, setBatchTotal] = useState(0);
+  // Post-search view filter; resets to "all" whenever a new search starts.
+  const [ownershipFilter, setOwnershipFilter] = useState<ResultsOwnershipFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
   const [settingsFirstRun, setSettingsFirstRun] = useState(false);
 
@@ -124,6 +129,10 @@ export default function App() {
   const remainingInResults = results.filter(
     (set) => !installedIds.has(set.id) && !downloadedIds.has(set.id)
   ).length;
+  const visibleResults = useMemo(
+    () => applyResultsFilter(results, ownershipFilter, installedIds, downloadedIds),
+    [results, ownershipFilter, installedIds, downloadedIds]
+  );
   const selectedRemaining = forceRedownload
     ? selected.size
     : [...selected].filter((id) => !installedIds.has(id) && !downloadedIds.has(id)).length;
@@ -141,6 +150,7 @@ export default function App() {
     setSearchError(null);
     setResults([]);
     setPagesFetched(0);
+    setOwnershipFilter("all");
 
     let cursorString: string | null = null;
     let page = 0;
@@ -191,7 +201,26 @@ export default function App() {
   }
 
   function toggleSelectAll(): void {
-    setSelected((prev) => (prev.size === results.length ? new Set() : new Set(results.map((r) => r.id))));
+    // Scope to what is visible under the active ownership filter: with
+    // "Missing only" on, select-all queues exactly the shown (missing) maps.
+    const visibleIds = visibleResults.map((set) => set.id);
+    setSelected((prev) => {
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      for (const id of visibleIds) {
+        if (allVisibleSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function changeOwnershipFilter(nextFilter: ResultsOwnershipFilter): void {
+    const nextVisible = applyResultsFilter(results, nextFilter, installedIds, downloadedIds);
+    // A selection should never become an invisible queued download when the
+    // view changes. Keep only selections that remain visible in the new view.
+    setSelected((previous) => retainVisibleSelections(previous, nextVisible));
+    setOwnershipFilter(nextFilter);
   }
 
   async function handleChooseFolder(): Promise<void> {
@@ -286,8 +315,16 @@ export default function App() {
             </p>
           )}
 
-          <ResultsList
+          <OwnershipFilterBar
             results={results}
+            installedIds={installedIds}
+            downloadedIds={downloadedIds}
+            value={ownershipFilter}
+            onChange={changeOwnershipFilter}
+          />
+
+          <ResultsList
+            results={visibleResults}
             selected={selected}
             downloadedIds={downloadedIds}
             installedIds={installedIds}
