@@ -11,6 +11,12 @@ import { DownloadPanel } from "./components/DownloadPanel";
 import { TitleBar } from "./components/TitleBar";
 import { DownloadBar } from "./components/DownloadBar";
 import { SettingsModal } from "./components/SettingsModal";
+import { OwnershipFilterBar } from "./components/OwnershipFilterBar";
+import {
+  applyResultsFilter,
+  retainVisibleSelections,
+  type ResultsOwnershipFilter,
+} from "./results-filter";
 
 const DEFAULT_FILTERS: SearchFilters = {
   query: "",
@@ -55,6 +61,7 @@ export default function App() {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
   const [batchTotal, setBatchTotal] = useState(0);
+  const [ownershipFilter, setOwnershipFilter] = useState<ResultsOwnershipFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
   const [settingsFirstRun, setSettingsFirstRun] = useState(false);
 
@@ -127,6 +134,18 @@ export default function App() {
   const remainingInResults = results.filter(
     (set) => !installedIds.has(set.id) && !downloadedIds.has(set.id)
   ).length;
+  const visibleResults = useMemo(
+    () => applyResultsFilter(results, ownershipFilter, installedIds, downloadedIds),
+    [results, ownershipFilter, installedIds, downloadedIds]
+  );
+
+  useEffect(() => {
+    setSelected((previous) => {
+      const next = retainVisibleSelections(previous, visibleResults);
+      return next.size === previous.size ? previous : next;
+    });
+  }, [visibleResults]);
+
   const selectedRemaining = forceRedownload
     ? selected.size
     : [...selected].filter((id) => !installedIds.has(id) && !downloadedIds.has(id)).length;
@@ -144,6 +163,7 @@ export default function App() {
     setSearchError(null);
     setResults([]);
     setPagesFetched(0);
+    setOwnershipFilter("all");
 
     let cursorString: string | null = null;
     let page = 0;
@@ -194,7 +214,17 @@ export default function App() {
   }
 
   function toggleSelectAll(): void {
-    setSelected((prev) => (prev.size === results.length ? new Set() : new Set(results.map((r) => r.id))));
+    const visibleIds = visibleResults.map((set) => set.id);
+    setSelected((previous) => {
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => previous.has(id));
+      return allVisibleSelected ? new Set() : new Set(visibleIds);
+    });
+  }
+
+  function changeOwnershipFilter(nextFilter: ResultsOwnershipFilter): void {
+    const nextVisible = applyResultsFilter(results, nextFilter, installedIds, downloadedIds);
+    setSelected((previous) => retainVisibleSelections(previous, nextVisible));
+    setOwnershipFilter(nextFilter);
   }
 
   async function handleChooseFolder(): Promise<void> {
@@ -296,8 +326,16 @@ export default function App() {
             </p>
           )}
 
-          <ResultsList
+          <OwnershipFilterBar
             results={results}
+            installedIds={installedIds}
+            downloadedIds={downloadedIds}
+            value={ownershipFilter}
+            onChange={changeOwnershipFilter}
+          />
+
+          <ResultsList
+            results={visibleResults}
             selected={selected}
             downloadedIds={downloadedIds}
             installedIds={installedIds}

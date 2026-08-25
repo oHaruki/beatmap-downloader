@@ -46,9 +46,6 @@ export interface SearchResult {
 
 export type DownloadStatus = "queued" | "downloading" | "done" | "error" | "skipped";
 
-/** Which osu! install a library folder belongs to. */
-export type LibraryKind = "stable" | "lazer";
-
 export interface DownloadJob {
   beatmapsetId: number;
   fileName: string;

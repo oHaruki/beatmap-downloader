@@ -80,7 +80,7 @@ ${installedCount} sets detected via ${installedSource ?? "..."}`
 
       <label
         className="toolbar-check"
-        title="Copy each finished download straight into your osu! Songs folder (or hand it to osu!lazer). Keep osu! closed when downloading for lazer."
+        title="Copy each finished download straight into your osu!stable Songs folder."
       >
         <input
           type="checkbox"

@@ -1,17 +1,14 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 import { promises as fs } from "fs";
-import path from "path";
 import type { DownloadJob, SearchFilters } from "@shared/types";
 import { searchBeatmapsets, OsuApiError, hasApiCredentials, resetTokenCache } from "./osu/api";
 import { findDefaultSongsFolder, listInstalledBeatmapsets } from "./osu/songs-folder";
 import {
-  defaultLazerCandidates,
   executeImportPlan,
-  findLazerExecutable,
   planAutoImport,
   type ImportOutcome,
 } from "./osu/auto-import-executor";
-import { importPlanForFile, type ImportTarget } from "./osu/auto-import";
+import { importPlanForFile } from "./osu/auto-import";
 import { getAutoImportEnabled, setAutoImportEnabled } from "./auto-import-config";
 import { runDownloadQueue } from "./download/queue";
 import { listDownloadedIds } from "./download/manifest";
@@ -25,19 +22,11 @@ interface AutoImportContext {
 }
 
 async function buildAutoImportContext(): Promise<AutoImportContext | null> {
-  const targets: ImportTarget[] = [];
-  const songsFolder = await findDefaultSongsFolder();
-  if (songsFolder) targets.push({ kind: "stable", path: songsFolder });
+  const config = await loadConfig();
+  const songsFolder = config.songsFolder ?? await findDefaultSongsFolder();
+  if (!songsFolder) return null;
 
-  // osu!lazer keeps no importable folder, so it is only worth a target when
-  // its executable is actually present under %LOCALAPPDATA%.
-  const localAppData = process.env.LOCALAPPDATA;
-  if (localAppData && findLazerExecutable(defaultLazerCandidates(localAppData))) {
-    targets.push({ kind: "lazer", path: path.join(localAppData, "osulazer") });
-  }
-  if (targets.length === 0) return null;
-
-  const planPromise = planAutoImport(targets, [], localAppData);
+  const planPromise = planAutoImport(songsFolder, [], process.env.LOCALAPPDATA);
   return {
     async run(file: string): Promise<ImportOutcome> {
       const base = await planPromise;
