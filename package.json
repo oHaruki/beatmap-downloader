@@ -9,7 +9,6 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist:win": "electron-vite build && electron-builder --win"
   },
@@ -27,8 +26,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.6.0",
-    "vite": "^5.4.0",
-    "vitest": "^4.1.11"
+    "vite": "^5.4.0"
   },
   "build": {
     "appId": "sh.haruki.beatmap-downloader",
