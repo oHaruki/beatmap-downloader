@@ -37,6 +37,11 @@ const api: RendererApi = {
     installedIds: number[]
   ): Promise<{ done: true }> => ipcRenderer.invoke("start-download", jobs, outDir, force, installedIds),
 
+  getAutoImportEnabled: (): Promise<boolean> => ipcRenderer.invoke("get-auto-import-enabled"),
+
+  setAutoImportEnabled: (enabled: boolean): Promise<boolean> =>
+    ipcRenderer.invoke("set-auto-import-enabled", enabled),
+
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: DownloadProgressEvent): void =>
       callback(progress);

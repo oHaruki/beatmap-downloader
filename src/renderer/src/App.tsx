@@ -50,6 +50,8 @@ export default function App() {
   const [installedIds, setInstalledIds] = useState<Set<number>>(new Set());
   const [installedSource, setInstalledSource] = useState<InstalledSongsScan["source"] | null>(null);
   const [forceRedownload, setForceRedownload] = useState(false);
+  // Import-on-download toggle; persisted in the main process.
+  const [autoImport, setAutoImport] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
   const [batchTotal, setBatchTotal] = useState(0);
@@ -59,6 +61,7 @@ export default function App() {
   useEffect(() => {
     void window.api.getOutputFolder().then(setOutputFolder);
     void window.api.getSongsFolder().then(setSongsFolder);
+    void window.api.getAutoImportEnabled().then(setAutoImport);
     void window.api.hasApiCredentials().then((has) => {
       if (!has) {
         setSettingsFirstRun(true);
@@ -199,6 +202,11 @@ export default function App() {
     if (folder) setOutputFolder(folder);
   }
 
+  function handleToggleAutoImport(value: boolean): void {
+    setAutoImport(value);
+    void window.api.setAutoImportEnabled(value);
+  }
+
   async function handleDownload(): Promise<void> {
     if (!outputFolder || selected.size === 0) return;
     setDownloading(true);
@@ -263,6 +271,8 @@ export default function App() {
         installedSource={installedSource}
         forceRedownload={forceRedownload}
         onToggleForceRedownload={setForceRedownload}
+        autoImport={autoImport}
+        onToggleAutoImport={handleToggleAutoImport}
       />
 
       <div className="app-body">
