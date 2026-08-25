@@ -8,9 +8,6 @@
 //                loose "<id>.osz". Sees fresh imports immediately, but is
 //                blind to folders renamed by hand or predating the id
 //                convention.
-//
-// Neither covers lazer, which stores beatmaps content-addressed under a
-// realm index rather than as named folders.
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";

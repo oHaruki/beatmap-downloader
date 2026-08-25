@@ -87,6 +87,8 @@ export interface RendererApi {
     force: boolean,
     installedIds: number[]
   ) => Promise<{ done: true }>;
+  getAutoImportEnabled: () => Promise<boolean>;
+  setAutoImportEnabled: (enabled: boolean) => Promise<boolean>;
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void) => () => void;
   windowMinimize: () => void;
   windowToggleMaximize: () => void;

@@ -14,6 +14,7 @@ export function DownloadPanel({ progress, labels, total }: Props) {
   const done = events.filter((e) => e.status === "done").length;
   const skipped = events.filter((e) => e.status === "skipped").length;
   const errors = events.filter((e) => e.status === "error");
+  const warnings = events.filter((e) => e.status === "done" && e.message);
   const remaining = Math.max(0, total - done - skipped - errors.length);
 
   return (
@@ -21,6 +22,11 @@ export function DownloadPanel({ progress, labels, total }: Props) {
       <div className="download-summary">
         <span>{done} done</span>
         <span>{skipped} already had</span>
+        {warnings.length > 0 && (
+          <span className="warning">
+            {warnings.length} import warning{warnings.length === 1 ? "" : "s"}
+          </span>
+        )}
         {errors.length > 0 && <span className="bad">{errors.length} failed</span>}
         <span className="remaining">{remaining} remaining</span>
       </div>
@@ -44,10 +50,15 @@ export function DownloadPanel({ progress, labels, total }: Props) {
         </div>
       )}
 
-      {errors.length > 0 && (
-        <div className="error-rows">
+      {(warnings.length > 0 || errors.length > 0) && (
+        <div className="message-rows">
+          {warnings.map((e) => (
+            <div key={`warning-${e.beatmapsetId}`} className="warning-row">
+              {labels.get(e.beatmapsetId) ?? e.beatmapsetId}: {e.message}
+            </div>
+          ))}
           {errors.map((e) => (
-            <div key={e.beatmapsetId} className="error-row">
+            <div key={`error-${e.beatmapsetId}`} className="error-row">
               {labels.get(e.beatmapsetId) ?? e.beatmapsetId}: {e.message}
             </div>
           ))}

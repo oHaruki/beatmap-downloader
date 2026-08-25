@@ -14,6 +14,8 @@ interface Props {
   installedSource: InstalledSongsScan["source"] | null;
   forceRedownload: boolean;
   onToggleForceRedownload: (value: boolean) => void;
+  autoImport: boolean;
+  onToggleAutoImport: (value: boolean) => void;
 }
 
 function tail(p: string, max = 28): string {
@@ -33,6 +35,8 @@ export function DownloadBar({
   installedSource,
   forceRedownload,
   onToggleForceRedownload,
+  autoImport,
+  onToggleAutoImport,
 }: Props) {
   return (
     <div className="download-bar">
@@ -72,6 +76,18 @@ ${installedCount} sets detected via ${installedSource ?? "..."}`
           onChange={(e) => onToggleForceRedownload(e.target.checked)}
         />
         re-download
+      </label>
+
+      <label
+        className="toolbar-check"
+        title="Copy each finished download straight into your osu!stable Songs folder."
+      >
+        <input
+          type="checkbox"
+          checked={autoImport}
+          onChange={(e) => onToggleAutoImport(e.target.checked)}
+        />
+        add to osu! as soon as downloaded
       </label>
 
       <button className="download-bar-settings" onClick={onOpenSettings} title="Settings">

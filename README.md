@@ -63,8 +63,7 @@ window if you prefer.
   folder itself, plus anything downloaded through this app before. osu! only
   rewrites `osu!.db` when it exits, so the Songs folder is rescanned
   whenever the window regains focus — import in osu!, alt-tab back, done.
-  Lazer is not covered; it stores beatmaps content-addressed rather than as
-  named folders.
+- The app currently targets osu!stable only.
 
 ## Downloading through your own account (WIP)
 
@@ -72,14 +71,12 @@ Working on a way to download through a real logged-in osu! session instead
 of only relying on mirrors, using your own account so it counts against
 your own entitlements rather than a shared path. Not done yet.
 
-## No auto-import
+## Optional auto-import
 
-Downloaded maps land in a folder you choose. They are not automatically
-copied into your osu! Songs folder or imported for you. Doing that for a
-large batch would mean dumping a lot of files into a running osu! client's
-watched folder very fast, which is not something this app wants to do to
-your client. Drag the `.osz` files in, or double-click them, whenever
-you're ready.
+Downloaded maps always remain in the output folder you choose. When
+**add to osu! as soon as downloaded** is enabled, each completed `.osz` is
+also copied silently into the configured osu!stable `Songs` folder. If that
+copy fails, the app falls back to opening the original file with osu!stable.
 
 ## Mirrors
 

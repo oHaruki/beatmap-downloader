@@ -32,12 +32,15 @@ async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promis
 
 // Skips ids already in the manifest or Songs folder unless force is true.
 // This is a backstop; the renderer filters these out before calling in.
+// When onImported is provided (auto-import enabled), each completed download
+// is handed to it so the file can be copied/launched into osu!.
 export async function runDownloadQueue(
   jobs: DownloadJob[],
   outDir: string,
   force: boolean,
   installedIds: number[],
-  onProgress: (event: DownloadProgressEvent) => void
+  onProgress: (event: DownloadProgressEvent) => void,
+  onImported?: (filePath: string, beatmapsetId: number) => Promise<string | undefined>
 ): Promise<void> {
   await fs.mkdir(outDir, { recursive: true });
   const manifest = await loadManifest(outDir);
@@ -45,7 +48,7 @@ export async function runDownloadQueue(
 
   await runPool(jobs, CONCURRENCY, async (job) => {
     if (!force && installed.has(job.beatmapsetId)) {
-      onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already in your osu! Songs folder" });
+      onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already installed" });
       return;
     }
     if (!force && manifest[String(job.beatmapsetId)]) {
@@ -73,7 +76,22 @@ export async function runDownloadQueue(
       const dest = path.join(outDir, fileName);
       await fs.writeFile(dest, data);
       await recordDownload(outDir, job.beatmapsetId, dest);
-      onProgress({ beatmapsetId: job.beatmapsetId, status: "done" });
+      let importMessage: string | undefined;
+      if (onImported) {
+        try {
+          // Wait for the copy/launch attempt before reporting the item done;
+          // otherwise the app could finish the batch while imports still run.
+          importMessage = await onImported(dest, job.beatmapsetId);
+        } catch (e) {
+          // Import problems never fail the download itself; report as a note.
+          importMessage = e instanceof Error ? e.message : "Import failed";
+        }
+      }
+      onProgress({
+        beatmapsetId: job.beatmapsetId,
+        status: "done",
+        ...(importMessage ? { message: importMessage } : {}),
+      });
     } catch (e) {
       onProgress({
         beatmapsetId: job.beatmapsetId,
