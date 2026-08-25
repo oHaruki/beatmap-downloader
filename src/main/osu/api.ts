@@ -33,10 +33,12 @@ async function getAccessToken(): Promise<string | null> {
   if (cache && cache.expiresAt > Date.now() + 10_000) return cache.token;
 
   try {
+    // osu!'s token endpoint only accepts application/x-www-form-urlencoded,
+    // not JSON (https://osu.ppy.sh/docs/#client-credentials-grant).
     const res = await fetch("https://osu.ppy.sh/oauth/token", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
         grant_type: "client_credentials",
