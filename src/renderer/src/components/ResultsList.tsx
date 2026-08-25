@@ -34,7 +34,7 @@ export function ResultsList({
   return (
     <div className="results-wrap">
       <label className="select-all-row">
-        <input type="checkbox" checked={allSelected} onChange={onToggleAll} />
+        <input className="result-checkbox" type="checkbox" checked={allSelected} onChange={onToggleAll} />
         {allSelected ? "Deselect all" : "Select all"} ({selected.size}/{results.length})
       </label>
       <div className="results-list">
@@ -43,15 +43,15 @@ export function ResultsList({
           const downloaded = !installed && downloadedIds.has(set.id);
           return (
             <label className={`result-row${installed || downloaded ? " downloaded" : ""}`} key={set.id}>
-              <input type="checkbox" checked={selected.has(set.id)} onChange={() => onToggle(set.id)} />
+              <input className="result-checkbox" type="checkbox" checked={selected.has(set.id)} onChange={() => onToggle(set.id)} />
               <span className="result-title">
                 {set.artist} - {set.title}
               </span>
               <span className="meta">
                 by {set.creator} · {set.status} · {starRange(set)}
               </span>
-              {installed && <span className="downloaded-badge">✓ in your osu!</span>}
-              {downloaded && <span className="downloaded-badge">✓ downloaded here</span>}
+              {installed && <span className="ownership-badge owned">owned</span>}
+              {downloaded && <span className="ownership-badge saved">saved</span>}
             </label>
           );
         })}

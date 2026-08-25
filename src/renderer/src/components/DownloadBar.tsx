@@ -67,6 +67,7 @@ ${installedCount} sets detected via ${installedSource ?? "..."}`
 
       <label className="toolbar-check" title="Download maps again even if you already have them">
         <input
+          className="result-checkbox"
           type="checkbox"
           checked={forceRedownload}
           onChange={(e) => onToggleForceRedownload(e.target.checked)}

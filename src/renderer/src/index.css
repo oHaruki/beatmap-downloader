@@ -540,6 +540,39 @@ button:disabled {
   flex-direction: column;
 }
 
+.result-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--panel);
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.result-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.result-checkbox:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.result-checkbox:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5 4.7 9 10 3.5' fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 10px 10px;
+}
+
 .select-all-row {
   display: flex;
   align-items: center;
@@ -578,8 +611,9 @@ button:disabled {
   background: var(--panel-alt);
 }
 
-.result-row.downloaded {
-  opacity: 0.6;
+.result-row.downloaded .result-title,
+.result-row.downloaded .meta {
+  opacity: 0.55;
 }
 
 .result-title {
@@ -596,10 +630,23 @@ button:disabled {
   padding-left: 8px;
 }
 
-.downloaded-badge {
-  color: var(--good);
-  font-size: 11.5px;
+.ownership-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-alt);
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 1.2;
   white-space: nowrap;
+}
+
+.ownership-badge.owned,
+.ownership-badge.saved {
+  border-color: rgba(95, 216, 138, 0.35);
+  background: rgba(95, 216, 138, 0.08);
+  color: var(--good);
 }
 
 /* --- download panel --- */
