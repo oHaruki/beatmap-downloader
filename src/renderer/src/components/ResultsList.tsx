@@ -50,7 +50,7 @@ export function ResultsList({
               <span className="meta">
                 by {set.creator} · {set.status} · {starRange(set)}
               </span>
-              {installed && <span className="downloaded-badge">✓ in your osu!</span>}
+              {installed && <span className="downloaded-badge">✓ installed</span>}
               {downloaded && <span className="downloaded-badge">✓ downloaded here</span>}
             </label>
           );

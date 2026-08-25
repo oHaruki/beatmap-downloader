@@ -39,6 +39,55 @@ body {
   height: 100%;
 }
 
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: 0 0 15px;
+  display: grid;
+  place-content: center;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--panel-alt);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  clip-path: polygon(14% 44%, 0 59%, 39% 100%, 100% 23%, 84% 9%, 37% 69%);
+  transform: scale(0);
+  transition: transform 0.1s ease;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: #a89eff;
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent-dim);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* --- custom scrollbar --- */
 
 ::-webkit-scrollbar {

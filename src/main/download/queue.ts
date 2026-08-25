@@ -48,7 +48,7 @@ export async function runDownloadQueue(
 
   await runPool(jobs, CONCURRENCY, async (job) => {
     if (!force && installed.has(job.beatmapsetId)) {
-      onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already in your osu! Songs folder" });
+      onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already installed" });
       return;
     }
     if (!force && manifest[String(job.beatmapsetId)]) {
