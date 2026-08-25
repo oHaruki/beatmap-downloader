@@ -10,6 +10,7 @@ export interface AppConfig {
   songsFolder: string | null;
   osuApiClientId: string | null;
   osuApiClientSecret: string | null;
+  autoImportEnabled: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -17,6 +18,7 @@ const DEFAULT_CONFIG: AppConfig = {
   songsFolder: null,
   osuApiClientId: null,
   osuApiClientSecret: null,
+  autoImportEnabled: false,
 };
 
 function configDir(): string {

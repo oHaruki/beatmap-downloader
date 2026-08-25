@@ -40,7 +40,7 @@ export async function runDownloadQueue(
   force: boolean,
   installedIds: number[],
   onProgress: (event: DownloadProgressEvent) => void,
-  onImported?: (filePath: string, beatmapsetId: number) => Promise<void>
+  onImported?: (filePath: string, beatmapsetId: number) => Promise<string | undefined>
 ): Promise<void> {
   await fs.mkdir(outDir, { recursive: true });
   const manifest = await loadManifest(outDir);
@@ -76,21 +76,22 @@ export async function runDownloadQueue(
       const dest = path.join(outDir, fileName);
       await fs.writeFile(dest, data);
       await recordDownload(outDir, job.beatmapsetId, dest);
+      let importMessage: string | undefined;
       if (onImported) {
         try {
           // Wait for the copy/launch attempt before reporting the item done;
           // otherwise the app could finish the batch while imports still run.
-          await onImported(dest, job.beatmapsetId);
+          importMessage = await onImported(dest, job.beatmapsetId);
         } catch (e) {
           // Import problems never fail the download itself; report as a note.
-          onProgress({
-            beatmapsetId: job.beatmapsetId,
-            status: "done",
-            message: e instanceof Error ? e.message : "Import failed",
-          });
+          importMessage = e instanceof Error ? e.message : "Import failed";
         }
       }
-      onProgress({ beatmapsetId: job.beatmapsetId, status: "done" });
+      onProgress({
+        beatmapsetId: job.beatmapsetId,
+        status: "done",
+        ...(importMessage ? { message: importMessage } : {}),
+      });
     } catch (e) {
       onProgress({
         beatmapsetId: job.beatmapsetId,
