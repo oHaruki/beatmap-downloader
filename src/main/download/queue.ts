@@ -32,12 +32,15 @@ async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promis
 
 // Skips ids already in the manifest or Songs folder unless force is true.
 // This is a backstop; the renderer filters these out before calling in.
+// When onImported is provided (auto-import enabled), each completed download
+// is handed to it so the file can be copied/launched into osu!.
 export async function runDownloadQueue(
   jobs: DownloadJob[],
   outDir: string,
   force: boolean,
   installedIds: number[],
-  onProgress: (event: DownloadProgressEvent) => void
+  onProgress: (event: DownloadProgressEvent) => void,
+  onImported?: (filePath: string, beatmapsetId: number) => Promise<void>
 ): Promise<void> {
   await fs.mkdir(outDir, { recursive: true });
   const manifest = await loadManifest(outDir);
@@ -73,6 +76,20 @@ export async function runDownloadQueue(
       const dest = path.join(outDir, fileName);
       await fs.writeFile(dest, data);
       await recordDownload(outDir, job.beatmapsetId, dest);
+      if (onImported) {
+        try {
+          // Wait for the move/launch attempt before reporting the item done;
+          // otherwise the app could finish the batch while imports still run.
+          await onImported(dest, job.beatmapsetId);
+        } catch (e) {
+          // Import problems never fail the download itself; report as a note.
+          onProgress({
+            beatmapsetId: job.beatmapsetId,
+            status: "done",
+            message: e instanceof Error ? e.message : "Import failed",
+          });
+        }
+      }
       onProgress({ beatmapsetId: job.beatmapsetId, status: "done" });
     } catch (e) {
       onProgress({

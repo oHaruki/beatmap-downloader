@@ -46,6 +46,9 @@ export interface SearchResult {
 
 export type DownloadStatus = "queued" | "downloading" | "done" | "error" | "skipped";
 
+/** Which osu! install a library folder belongs to. */
+export type LibraryKind = "stable" | "lazer";
+
 export interface DownloadJob {
   beatmapsetId: number;
   fileName: string;
@@ -87,6 +90,8 @@ export interface RendererApi {
     force: boolean,
     installedIds: number[]
   ) => Promise<{ done: true }>;
+  getAutoImportEnabled: () => Promise<boolean>;
+  setAutoImportEnabled: (enabled: boolean) => Promise<boolean>;
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void) => () => void;
   windowMinimize: () => void;
   windowToggleMaximize: () => void;

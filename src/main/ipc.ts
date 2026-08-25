@@ -1,11 +1,62 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 import { promises as fs } from "fs";
+import path from "path";
 import type { DownloadJob, SearchFilters } from "@shared/types";
 import { searchBeatmapsets, OsuApiError, hasApiCredentials, resetTokenCache } from "./osu/api";
 import { findDefaultSongsFolder, listInstalledBeatmapsets } from "./osu/songs-folder";
+import {
+  defaultLazerCandidates,
+  executeImportPlan,
+  findLazerExecutable,
+  planAutoImport,
+  type ImportOutcome,
+} from "./osu/auto-import-executor";
+import { importPlanForFile, type ImportTarget } from "./osu/auto-import";
+import { getAutoImportEnabled, setAutoImportEnabled } from "./auto-import-config";
 import { runDownloadQueue } from "./download/queue";
 import { listDownloadedIds } from "./download/manifest";
 import { loadConfig, saveConfig, getDefaultDownloadsFolder } from "./config";
+
+// Auto-import plumbing: capture the available library targets and game
+// executable once per download batch, then import each completed .osz
+// independently as it lands.
+interface AutoImportContext {
+  run: (file: string) => Promise<ImportOutcome>;
+}
+
+async function buildAutoImportContext(): Promise<AutoImportContext | null> {
+  const targets: ImportTarget[] = [];
+  const songsFolder = await findDefaultSongsFolder();
+  if (songsFolder) targets.push({ kind: "stable", path: songsFolder });
+
+  // osu!lazer keeps no importable folder, so it is only worth a target when
+  // its executable is actually present under %LOCALAPPDATA%.
+  const localAppData = process.env.LOCALAPPDATA;
+  if (localAppData && findLazerExecutable(defaultLazerCandidates(localAppData))) {
+    targets.push({ kind: "lazer", path: path.join(localAppData, "osulazer") });
+  }
+  if (targets.length === 0) return null;
+
+  const planPromise = planAutoImport(targets, [], localAppData);
+  return {
+    async run(file: string): Promise<ImportOutcome> {
+      const base = await planPromise;
+      return executeImportPlan(importPlanForFile(base, file));
+    },
+  };
+}
+
+async function runImport(file: string, context: AutoImportContext): Promise<ImportOutcome> {
+  try {
+    return await context.run(file);
+  } catch (error) {
+    return {
+      imported: 0,
+      deferred: true,
+      message: error instanceof Error ? error.message : "Import failed.",
+    };
+  }
+}
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle("search-beatmapsets", async (_event, filters: SearchFilters) => {
@@ -64,6 +115,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     listInstalledBeatmapsets(songsFolder)
   );
 
+  ipcMain.handle("get-auto-import-enabled", () => getAutoImportEnabled());
+  ipcMain.handle("set-auto-import-enabled", (_event, enabled: boolean) =>
+    setAutoImportEnabled(Boolean(enabled))
+  );
+
   ipcMain.handle("has-api-credentials", () => hasApiCredentials());
 
   ipcMain.handle("set-api-credentials", async (_event, clientId: string, clientSecret: string) => {
@@ -76,9 +132,32 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     "start-download",
     async (_event, jobs: DownloadJob[], outDir: string, force: boolean, installedIds: number[]) => {
       const win = getWindow();
-      await runDownloadQueue(jobs, outDir, force, installedIds, (progress) => {
-        win?.webContents.send("download-progress", progress);
-      });
+      // Auto-import (when enabled): hand each finished .osz to the import
+      // planner. The plan is built once per batch; each callback carries only
+      // the newly finished file so earlier maps are never submitted again.
+      const importEnabled = await getAutoImportEnabled();
+      const importContext = importEnabled ? await buildAutoImportContext() : null;
+      await runDownloadQueue(
+        jobs,
+        outDir,
+        force,
+        installedIds,
+        (progress) => {
+          win?.webContents.send("download-progress", progress);
+        },
+        importContext
+          ? async (filePath, beatmapsetId) => {
+              const result = await runImport(filePath, importContext);
+              if (result.message) {
+                win?.webContents.send("download-progress", {
+                  beatmapsetId,
+                  status: "done",
+                  message: result.message,
+                });
+              }
+            }
+          : undefined
+      );
       return { done: true };
     }
   );
