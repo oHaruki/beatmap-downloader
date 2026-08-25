@@ -42,10 +42,10 @@ body {
 input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   margin: 0;
-  flex: 0 0 15px;
+  flex: 0 0 13px;
   display: grid;
   place-content: center;
   border: 1px solid var(--accent);
@@ -57,8 +57,8 @@ input[type="checkbox"] {
 
 input[type="checkbox"]::before {
   content: "";
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   background: #fff;
   clip-path: polygon(14% 44%, 0 59%, 39% 100%, 100% 23%, 84% 9%, 37% 69%);
   transform: scale(0);
