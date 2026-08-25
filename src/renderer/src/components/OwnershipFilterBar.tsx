@@ -41,7 +41,7 @@ export function OwnershipFilterBar({
 
   const counts = countByOwnership(results, installedIds, downloadedIds);
   return (
-    <div aria-label="Filter search results by ownership">
+    <div className="ownership-filter" aria-label="Filter search results by ownership">
       <div className="chip-row">
         {OPTIONS.map((option) => (
           <button
