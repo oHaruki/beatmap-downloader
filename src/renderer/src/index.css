@@ -564,6 +564,11 @@ button:disabled {
   flex-shrink: 0;
 }
 
+.ownership-filter .search-status {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
 /* --- results --- */
 
 .empty-hint {
