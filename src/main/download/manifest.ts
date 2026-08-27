@@ -47,5 +47,8 @@ export async function recordDownload(outDir: string, beatmapsetId: number, fileP
 
 export async function listDownloadedIds(outDir: string): Promise<number[]> {
   const manifest = await loadManifest(outDir);
-  return Object.keys(manifest).map(Number);
+  return Object.keys(manifest)
+    .map(Number)
+    .filter((id) => Number.isSafeInteger(id) && id > 0)
+    .sort((left, right) => left - right);
 }
