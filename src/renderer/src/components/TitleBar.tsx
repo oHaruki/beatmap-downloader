@@ -18,13 +18,17 @@ export function TitleBar() {
       </div>
 
       <div className="titlebar-buttons">
-        <button className="titlebar-button" onClick={() => window.api.windowMinimize()}>
+        <button className="titlebar-button" aria-label="Minimize window" onClick={() => window.api.windowMinimize()}>
           <IconMinimize />
         </button>
-        <button className="titlebar-button" onClick={() => window.api.windowToggleMaximize()}>
+        <button
+          className="titlebar-button"
+          aria-label={maximized ? "Restore window" : "Maximize window"}
+          onClick={() => window.api.windowToggleMaximize()}
+        >
           {maximized ? <IconRestore /> : <IconMaximize />}
         </button>
-        <button className="titlebar-button close" onClick={() => window.api.windowClose()}>
+        <button className="titlebar-button close" aria-label="Close window" onClick={() => window.api.windowClose()}>
           <IconClose />
         </button>
       </div>
