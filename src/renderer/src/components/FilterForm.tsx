@@ -19,6 +19,7 @@ interface Props {
   filters: SearchFilters;
   onChange: (filters: SearchFilters) => void;
   onSearch: () => void;
+  onReset: () => void;
   loading: boolean;
 }
 
@@ -39,7 +40,7 @@ const MODE_OPTIONS: { value: SearchFilters["mode"]; label: string; icon: React.R
   { value: "3", label: "Mania", icon: <IconBars /> },
 ];
 
-export function FilterForm({ filters, onChange, onSearch, loading }: Props) {
+export function FilterForm({ filters, onChange, onSearch, onReset, loading }: Props) {
   const set = <K extends keyof SearchFilters>(key: K, value: SearchFilters[K]): void =>
     onChange({ ...filters, [key]: value });
 
@@ -52,8 +53,13 @@ export function FilterForm({ filters, onChange, onSearch, loading }: Props) {
           value={filters.query}
           onChange={(e) => set("query", e.target.value)}
           placeholder="Search by artist, title, or mapper"
-          onKeyDown={(e) => e.key === "Enter" && onSearch()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !loading) onSearch();
+          }}
         />
+        <button type="button" onClick={onReset} disabled={loading}>
+          Reset
+        </button>
         <button className="search-button" onClick={onSearch} disabled={loading}>
           {loading ? "Searching" : "Search"}
         </button>

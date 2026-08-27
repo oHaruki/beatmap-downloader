@@ -7,6 +7,7 @@ interface Props {
   installedIds: Set<number>;
   onToggle: (id: number) => void;
   onToggleAll: () => void;
+  emptyMessage: string;
 }
 
 function starRange(set: BeatmapsetSummary): string {
@@ -24,9 +25,10 @@ export function ResultsList({
   installedIds,
   onToggle,
   onToggleAll,
+  emptyMessage,
 }: Props) {
   if (results.length === 0) {
-    return <p className="empty-hint">No results yet. Try a search above.</p>;
+    return <p className="empty-hint">{emptyMessage}</p>;
   }
 
   const allSelected = results.length > 0 && results.every((set) => selected.has(set.id));
