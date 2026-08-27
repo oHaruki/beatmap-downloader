@@ -2,6 +2,7 @@ import "dotenv/config";
 import { app, BrowserWindow, Menu, shell } from "electron";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
+import { safeExternalUrl } from "./external-url";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -36,7 +37,12 @@ function createWindow(): void {
   mainWindow.on("unmaximize", sendMaximizedState);
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url);
+    const url = safeExternalUrl(details.url);
+    if (url) {
+      void shell.openExternal(url).catch((error) => {
+        console.warn(`[external-url] could not open ${url}: ${error instanceof Error ? error.message : error}`);
+      });
+    }
     return { action: "deny" };
   });
 

@@ -9,7 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "test": "node --experimental-default-type=module --test src/main/download/manifest.test.ts",
+    "test": "node --experimental-default-type=module --test src/main/download/manifest.test.ts src/main/external-url.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist:win": "electron-vite build && electron-builder --win"
   },

@@ -90,7 +90,7 @@ ${installedCount} sets detected via ${installedSource ?? "..."}`
         add to osu! as soon as downloaded
       </label>
 
-      <button className="download-bar-settings" onClick={onOpenSettings} title="Settings">
+      <button className="download-bar-settings" onClick={onOpenSettings} title="Settings" aria-label="Open settings">
         <IconGear />
       </button>
     </div>
