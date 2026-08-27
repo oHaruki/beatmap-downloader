@@ -1,6 +1,6 @@
 {
   "name": "beatmap-downloader",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Batch osu! beatmap downloader. Filter by star rating, mode, and status via the official API, download the actual files via a mirror cascade.",
   "main": "./out/main/index.js",
   "author": "Haruki",
@@ -9,6 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
+    "test": "node --experimental-default-type=module --test src/main/download/manifest.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist:win": "electron-vite build && electron-builder --win"
   },
