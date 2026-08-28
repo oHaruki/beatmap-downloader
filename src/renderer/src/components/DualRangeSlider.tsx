@@ -11,8 +11,12 @@ interface Props {
 }
 
 export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, unit = "", onChangeMin, onChangeMax }: Props) {
-  const numMin = valueMin.trim() === "" ? min : Number(valueMin);
-  const numMax = valueMax.trim() === "" ? max : Number(valueMax);
+  const clamp = (value: number, fallback: number): number =>
+    Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+  const rawMin = clamp(valueMin.trim() === "" ? min : Number(valueMin), min);
+  const rawMax = clamp(valueMax.trim() === "" ? max : Number(valueMax), max);
+  const numMin = Math.min(rawMin, rawMax);
+  const numMax = Math.max(rawMin, rawMax);
   const pctMin = ((numMin - min) / (max - min)) * 100;
   const pctMax = ((numMax - min) / (max - min)) * 100;
 
@@ -48,6 +52,9 @@ export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, uni
       <div className="dual-slider-inputs">
         <input
           type="number"
+          min={min}
+          max={max}
+          step={step}
           value={valueMin}
           placeholder={String(min)}
           onChange={(e) => onChangeMin(e.target.value)}
@@ -56,6 +63,9 @@ export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, uni
         <span className="dual-slider-sep">to</span>
         <input
           type="number"
+          min={min}
+          max={max}
+          step={step}
           value={valueMax}
           placeholder={String(max)}
           onChange={(e) => onChangeMax(e.target.value)}

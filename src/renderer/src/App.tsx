@@ -46,8 +46,10 @@ export default function App() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasCompletedSearch, setHasCompletedSearch] = useState(false);
   const [pagesFetched, setPagesFetched] = useState(0);
   const cancelSearchRef = useRef(false);
+  const searchInFlightRef = useRef(false);
   const installedScanRef = useRef(false);
 
   const [outputFolder, setOutputFolder] = useState<string | null>(null);
@@ -158,9 +160,12 @@ export default function App() {
       : { text: "ready", tone: "ok" as const };
 
   async function runSearch(): Promise<void> {
+    if (searchInFlightRef.current) return;
+    searchInFlightRef.current = true;
     cancelSearchRef.current = false;
     setSearchLoading(true);
     setSearchError(null);
+    setHasCompletedSearch(false);
     setResults([]);
     setPagesFetched(0);
     setOwnershipFilter("all");
@@ -190,12 +195,17 @@ export default function App() {
         if (!cursorString || result.beatmapsets.length === 0 || cancelSearchRef.current) break;
         await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
       }
+      setHasCompletedSearch(true);
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : "Search failed unexpectedly.");
     } finally {
+      searchInFlightRef.current = false;
       setSearchLoading(false);
     }
   }
 
   function handleSearch(): void {
+    if (searchInFlightRef.current || searchLoading) return;
     setSelected(new Set());
     void runSearch();
   }
@@ -269,6 +279,12 @@ export default function App() {
         ? `Download ${selected.size} selected`
         : `Download ${selectedRemaining} of ${selected.size}`;
 
+  const emptyResultsMessage = results.length > 0
+    ? "No maps match the selected ownership filter."
+    : hasCompletedSearch
+      ? "No beatmaps matched this search."
+      : "No results yet. Try a search above.";
+
   return (
     <div className="app-shell">
       <TitleBar />
@@ -307,7 +323,13 @@ export default function App() {
 
       <div className="app-body">
         <aside className="sidebar">
-          <FilterForm filters={filters} onChange={setFilters} onSearch={handleSearch} loading={searchLoading} />
+          <FilterForm
+            filters={filters}
+            onChange={setFilters}
+            onSearch={handleSearch}
+            onReset={() => setFilters(DEFAULT_FILTERS)}
+            loading={searchLoading}
+          />
         </aside>
 
         <main className="main-panel">
@@ -341,6 +363,7 @@ export default function App() {
             installedIds={installedIds}
             onToggle={toggleSelected}
             onToggleAll={toggleSelectAll}
+            emptyMessage={emptyResultsMessage}
           />
 
           <DownloadPanel progress={progress} labels={labels} total={batchTotal} />
