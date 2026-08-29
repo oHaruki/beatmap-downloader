@@ -8,8 +8,10 @@ interface Props {
   onOpenSettings: () => void;
   outputFolder: string | null;
   onChooseOutputFolder: () => void;
+  onOpenOutputFolder: () => void;
   songsFolder: string | null;
   onChooseSongsFolder: () => void;
+  onOpenSongsFolder: () => void;
   installedCount: number;
   installedSource: InstalledSongsScan["source"] | null;
   forceRedownload: boolean;
@@ -29,8 +31,10 @@ export function DownloadBar({
   onOpenSettings,
   outputFolder,
   onChooseOutputFolder,
+  onOpenOutputFolder,
   songsFolder,
   onChooseSongsFolder,
+  onOpenSongsFolder,
   installedCount,
   installedSource,
   forceRedownload,
@@ -44,30 +48,50 @@ export function DownloadBar({
         {label}
       </button>
 
-      <button
-        className="toolbar-folder"
-        onClick={onChooseOutputFolder}
-        title={outputFolder ?? "Choose where downloads are saved"}
-      >
-        <span className="toolbar-folder-label">Output</span>
-        <span className="toolbar-folder-path">{outputFolder ? tail(outputFolder) : "not set"}</span>
-      </button>
+      <div className="toolbar-folder-group">
+        <button
+          className="toolbar-folder"
+          onClick={onChooseOutputFolder}
+          title={outputFolder ?? "Choose where downloads are saved"}
+        >
+          <span className="toolbar-folder-label">Output</span>
+          <span className="toolbar-folder-path">{outputFolder ? tail(outputFolder) : "not set"}</span>
+        </button>
+        <button
+          className="toolbar-folder-open"
+          onClick={onOpenOutputFolder}
+          disabled={!outputFolder}
+          title="Open output folder"
+        >
+          Open
+        </button>
+      </div>
 
-      <button
-        className="toolbar-folder"
-        onClick={onChooseSongsFolder}
-        title={
-          songsFolder
-            ? `${songsFolder}
+      <div className="toolbar-folder-group">
+        <button
+          className="toolbar-folder"
+          onClick={onChooseSongsFolder}
+          title={
+            songsFolder
+              ? `${songsFolder}
 ${installedCount} sets detected via ${installedSource ?? "..."}`
-            : "Choose your osu! Songs folder so owned maps are skipped"
-        }
-      >
-        <span className="toolbar-folder-label">osu! Songs</span>
-        <span className="toolbar-folder-path">
-          {songsFolder ? `${installedCount} maps` : "not set"}
-        </span>
-      </button>
+              : "Choose your osu! Songs folder so owned maps are skipped"
+          }
+        >
+          <span className="toolbar-folder-label">osu! Songs</span>
+          <span className="toolbar-folder-path">
+            {songsFolder ? `${installedCount} maps` : "not set"}
+          </span>
+        </button>
+        <button
+          className="toolbar-folder-open"
+          onClick={onOpenSongsFolder}
+          disabled={!songsFolder}
+          title="Open osu! Songs folder"
+        >
+          Open
+        </button>
+      </div>
 
       <label className="toolbar-check" title="Download maps again even if you already have them">
         <input

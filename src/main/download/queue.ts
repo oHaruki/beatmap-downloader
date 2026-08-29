@@ -1,25 +1,72 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import type { DownloadJob, DownloadProgressEvent } from "@shared/types";
-import { downloadFromMirror } from "./mirror";
+import { downloadFromMirrorToFile, type MirrorDownloadOptions } from "./mirror";
 import { loadManifest, recordDownload } from "./manifest";
 
 const CONCURRENCY = 3;
-const STAGGER_MS = 250; // spreads out request starts instead of firing in bursts
+const STAGGER_MS = 250;
 const INVALID_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
 
-function safeFileName(name: string): string {
-  const cleaned = name.replace(INVALID_CHARS, "_").trim().replace(/\.+$/, "");
+export interface DownloadQueueOptions {
+  jobs: DownloadJob[];
+  outDir: string;
+  force: boolean;
+  installedIds: number[];
+  signal?: AbortSignal;
+  onProgress: (event: DownloadProgressEvent) => void;
+  onImported?: (filePath: string, beatmapsetId: number) => Promise<string | undefined>;
+}
+
+export interface DownloadQueueDeps {
+  download?: (
+    beatmapsetId: number,
+    destination: string,
+    options: MirrorDownloadOptions,
+  ) => Promise<{ mirror: string }>;
+}
+
+export function safeFileName(name: string): string {
+  const cleaned = name.replace(INVALID_CHARS, "_").trim().replace(/[ .]+$/, "");
   return (cleaned || "beatmapset").slice(0, 150);
 }
 
-async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+function uniqueJobs(jobs: DownloadJob[]): DownloadJob[] {
+  const seen = new Set<number>();
+  return jobs.filter((job) => {
+    if (seen.has(job.beatmapsetId)) return false;
+    seen.add(job.beatmapsetId);
+    return true;
+  });
+}
+
+function isReplacementError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "EEXIST" || error.code === "EPERM")
+  );
+}
+
+async function replaceFile(temporaryPath: string, destination: string): Promise<void> {
+  try {
+    await fs.rename(temporaryPath, destination);
+  } catch (error) {
+    if (!isReplacementError(error)) throw error;
+    await fs.rm(destination, { force: true });
+    await fs.rename(temporaryPath, destination);
+  }
+}
+
+async function runPool<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
   let next = 0;
-  // Each slot's first request is staggered from the others (0ms, 250ms,
-  // 500ms, ...); after that, real download latency keeps them naturally
-  // spread out, so no per-item delay is needed within a slot.
   async function runSlot(slot: number): Promise<void> {
-    if (slot > 0) await new Promise((r) => setTimeout(r, slot * STAGGER_MS));
+    if (slot > 0) await new Promise((resolve) => setTimeout(resolve, slot * STAGGER_MS));
     for (;;) {
       const index = next++;
       if (index >= items.length) return;
@@ -30,73 +77,84 @@ async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promis
   await Promise.all(Array.from({ length: slots }, (_, slot) => runSlot(slot)));
 }
 
-// Skips ids already in the manifest or Songs folder unless force is true.
-// This is a backstop; the renderer filters these out before calling in.
-// When onImported is provided (auto-import enabled), each completed download
-// is handed to it so the file can be copied/launched into osu!.
 export async function runDownloadQueue(
-  jobs: DownloadJob[],
-  outDir: string,
-  force: boolean,
-  installedIds: number[],
-  onProgress: (event: DownloadProgressEvent) => void,
-  onImported?: (filePath: string, beatmapsetId: number) => Promise<string | undefined>
+  options: DownloadQueueOptions,
+  deps: DownloadQueueDeps = {},
 ): Promise<void> {
-  await fs.mkdir(outDir, { recursive: true });
-  const manifest = await loadManifest(outDir);
-  const installed = new Set(installedIds);
+  const jobs = uniqueJobs(options.jobs);
+  const download = deps.download ?? downloadFromMirrorToFile;
+  await fs.mkdir(options.outDir, { recursive: true });
+  const manifest = await loadManifest(options.outDir);
+  const downloaded = new Set(Object.keys(manifest).map(Number));
+  const installed = new Set(options.installedIds);
+
+  for (const job of jobs) {
+    options.onProgress({ beatmapsetId: job.beatmapsetId, status: "queued" });
+  }
 
   await runPool(jobs, CONCURRENCY, async (job) => {
-    if (!force && installed.has(job.beatmapsetId)) {
-      onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already installed" });
+    if (options.signal?.aborted) {
+      options.onProgress({ beatmapsetId: job.beatmapsetId, status: "cancelled" });
       return;
     }
-    if (!force && manifest[String(job.beatmapsetId)]) {
-      onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already downloaded" });
+    if (!options.force && installed.has(job.beatmapsetId)) {
+      options.onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already installed" });
+      return;
+    }
+    if (!options.force && downloaded.has(job.beatmapsetId)) {
+      options.onProgress({ beatmapsetId: job.beatmapsetId, status: "skipped", message: "already downloaded" });
       return;
     }
 
-    onProgress({ beatmapsetId: job.beatmapsetId, status: "downloading", progressPercent: null });
+    const fileName = `${job.beatmapsetId} ${safeFileName(job.fileName)}.osz`;
+    const destination = path.join(options.outDir, fileName);
+    const temporaryPath = `${destination}.part`;
+    options.onProgress({ beatmapsetId: job.beatmapsetId, status: "downloading", progressPercent: null });
+
     try {
       let lastReportedStep = -1;
-      const { data } = await downloadFromMirror(job.beatmapsetId, (received, total) => {
-        if (!total) return; // unknown size, stay indeterminate rather than fake a percent
-        const step = Math.floor((received / total) * 20); // report every ~5%
-        if (step === lastReportedStep) return;
-        lastReportedStep = step;
-        onProgress({
-          beatmapsetId: job.beatmapsetId,
-          status: "downloading",
-          progressPercent: Math.min(100, Math.round((received / total) * 100)),
-        });
+      const result = await download(job.beatmapsetId, temporaryPath, {
+        signal: options.signal,
+        onProgress(received, total) {
+          if (!total) return;
+          const step = Math.floor((received / total) * 20);
+          if (step === lastReportedStep) return;
+          lastReportedStep = step;
+          options.onProgress({
+            beatmapsetId: job.beatmapsetId,
+            status: "downloading",
+            progressPercent: Math.min(100, Math.round((received / total) * 100)),
+          });
+        },
       });
-      // Prefix with the beatmapset id (osu!stable's own naming convention)
-      // so these files are recognized as installed by any future Songs scan.
-      const fileName = `${job.beatmapsetId} ${safeFileName(job.fileName)}.osz`;
-      const dest = path.join(outDir, fileName);
-      await fs.writeFile(dest, data);
-      await recordDownload(outDir, job.beatmapsetId, dest);
+      await replaceFile(temporaryPath, destination);
+      await recordDownload(options.outDir, job.beatmapsetId, destination);
+      downloaded.add(job.beatmapsetId);
+
       let importMessage: string | undefined;
-      if (onImported) {
+      if (options.onImported) {
         try {
-          // Wait for the copy/launch attempt before reporting the item done;
-          // otherwise the app could finish the batch while imports still run.
-          importMessage = await onImported(dest, job.beatmapsetId);
-        } catch (e) {
-          // Import problems never fail the download itself; report as a note.
-          importMessage = e instanceof Error ? e.message : "Import failed";
+          importMessage = await options.onImported(destination, job.beatmapsetId);
+        } catch (error) {
+          importMessage = error instanceof Error ? error.message : "Import failed";
         }
       }
-      onProgress({
+      options.onProgress({
         beatmapsetId: job.beatmapsetId,
         status: "done",
+        mirror: result.mirror,
         ...(importMessage ? { message: importMessage } : {}),
       });
-    } catch (e) {
-      onProgress({
+    } catch (error) {
+      await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+        options.onProgress({ beatmapsetId: job.beatmapsetId, status: "cancelled" });
+        return;
+      }
+      options.onProgress({
         beatmapsetId: job.beatmapsetId,
         status: "error",
-        message: e instanceof Error ? e.message : "Download failed",
+        message: error instanceof Error ? error.message : "Download failed",
       });
     }
   });

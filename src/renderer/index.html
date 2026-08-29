@@ -2,9 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- img-src needs data: because the build inlines small assets (the app
-         icon) as data URIs, which default-src 'self' would otherwise block. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+    <!-- Remote images are limited to osu!'s image CDN for beatmap covers. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://assets.ppy.sh" />
     <title>beatmap-downloader</title>
   </head>
   <body>

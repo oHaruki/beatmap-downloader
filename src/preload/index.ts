@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   DownloadJob,
   DownloadProgressEvent,
+  CredentialSaveResult,
   InstalledSongsScan,
   RendererApi,
   SearchFilters,
@@ -11,6 +12,8 @@ import type {
 const api: RendererApi = {
   searchBeatmapsets: (filters: SearchFilters): Promise<SearchResult> =>
     ipcRenderer.invoke("search-beatmapsets", filters),
+
+  cancelSearch: (): Promise<boolean> => ipcRenderer.invoke("cancel-search"),
 
   chooseOutputFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-output-folder"),
 
@@ -27,7 +30,7 @@ const api: RendererApi = {
 
   hasApiCredentials: (): Promise<boolean> => ipcRenderer.invoke("has-api-credentials"),
 
-  setApiCredentials: (clientId: string, clientSecret: string): Promise<boolean> =>
+  setApiCredentials: (clientId: string, clientSecret: string): Promise<CredentialSaveResult> =>
     ipcRenderer.invoke("set-api-credentials", clientId, clientSecret),
 
   startDownload: (
@@ -37,10 +40,16 @@ const api: RendererApi = {
     installedIds: number[]
   ): Promise<{ done: true }> => ipcRenderer.invoke("start-download", jobs, outDir, force, installedIds),
 
+  cancelDownload: (): Promise<boolean> => ipcRenderer.invoke("cancel-download"),
+
   getAutoImportEnabled: (): Promise<boolean> => ipcRenderer.invoke("get-auto-import-enabled"),
 
   setAutoImportEnabled: (enabled: boolean): Promise<boolean> =>
     ipcRenderer.invoke("set-auto-import-enabled", enabled),
+
+  openOutputFolder: (): Promise<string> => ipcRenderer.invoke("open-output-folder"),
+
+  openSongsFolder: (): Promise<string> => ipcRenderer.invoke("open-songs-folder"),
 
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: DownloadProgressEvent): void =>

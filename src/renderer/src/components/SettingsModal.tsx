@@ -18,7 +18,11 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
     setSaving(true);
     setSaveError(null);
     try {
-      await window.api.setApiCredentials(clientId.trim(), clientSecret.trim());
+      const result = await window.api.setApiCredentials(clientId.trim(), clientSecret.trim());
+      if (!result.ok) {
+        setSaveError(result.error);
+        return;
+      }
       onSaved();
       onClose();
     } catch {

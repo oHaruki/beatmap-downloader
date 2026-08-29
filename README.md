@@ -10,7 +10,8 @@
 
 Filter by star rating, mode, status, BPM, length, AR, CS, OD, and HP drain
 through the official osu! API, then pull the actual files through a mirror
-cascade.
+cascade. Search results include cover art and links back to osu!, and are
+loaded in small batches so broad searches stay under control.
 
 ## Early build, expect rough edges
 
@@ -41,22 +42,31 @@ code signed.
 
 ### Running from source
 
+Node.js 22.12 or newer is required.
+
 ```bash
 git clone https://github.com/oHaruki/beatmap-downloader.git
 cd beatmap-downloader
-npm install
+npm ci
 npm run dev
 ```
 
 Credentials can go in a `.env` (see `.env.example`) instead of the settings
 window if you prefer.
 
+Run `npm run check` before opening a pull request. It type-checks the main and
+renderer processes, runs the test suite, and verifies a production build.
+
 ## How it works
 
 - Searching and filtering goes through the official osu! API v2.
+- Searches fetch three pages at a time. Use **Load more** to continue a broad
+  search, or cancel it without losing the results already found.
 - The actual `.osz` files come from a mirror cascade (Nekoha, then Nerinyan,
   then Beatconnect), since osu.ppy.sh requires a real logged-in session for
-  direct downloads.
+  direct downloads. Files are streamed to temporary `.part` files and only
+  moved into place after validation, so an interrupted download cannot look
+  complete. Failed or cancelled items can be retried from the download panel.
 - Maps you already have are detected and skipped automatically. Ownership
   is read from `osu!.db` (osu!'s own index, which knows the real beatmapset
   id no matter what a folder is named) unioned with a scan of the Songs

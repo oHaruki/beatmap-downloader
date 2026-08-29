@@ -1,7 +1,9 @@
 // osu! API v2 client (client-credentials grant), search/metadata only.
 
-import type { BeatmapsetSummary, SearchFilters } from "@shared/types";
+import type { BeatmapDifficulty, BeatmapsetSummary, SearchFilters } from "@shared/types";
 import { loadConfig } from "../config";
+import { isRecord } from "../json-file";
+import { buildSearchUrl } from "./search-query";
 
 interface TokenCache {
   token: string;
@@ -24,18 +26,19 @@ export async function hasApiCredentials(): Promise<boolean> {
   );
 }
 
-async function getAccessToken(): Promise<string | null> {
-  const config = await loadConfig();
-  const clientId = config.osuApiClientId || process.env.OSU_API_CLIENT_ID;
-  const clientSecret = config.osuApiClientSecret || process.env.OSU_API_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
+function requestSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
 
-  if (cache && cache.expiresAt > Date.now() + 10_000) return cache.token;
-
+async function requestAccessToken(
+  clientId: string,
+  clientSecret: string,
+  signal?: AbortSignal,
+): Promise<TokenCache> {
+  let res: Response;
   try {
-    // osu!'s token endpoint only accepts application/x-www-form-urlencoded,
-    // not JSON (https://osu.ppy.sh/docs/#client-credentials-grant).
-    const res = await fetch("https://osu.ppy.sh/oauth/token", {
+    res = await fetch("https://osu.ppy.sh/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
       body: new URLSearchParams({
@@ -44,14 +47,52 @@ async function getAccessToken(): Promise<string | null> {
         grant_type: "client_credentials",
         scope: "public",
       }),
+      signal: requestSignal(signal, 15_000),
     });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { access_token: string; expires_in: number };
-    cache = { token: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
-    return cache.token;
-  } catch {
-    return null;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new OsuApiError("The osu! API did not respond in time. Try again.");
+    }
+    throw new OsuApiError("Could not reach the osu! API. Check your connection and try again.");
   }
+
+  if (res.status === 400 || res.status === 401) {
+    throw new OsuApiError("The osu! API rejected these credentials. Check the client ID and secret.", res.status);
+  }
+  if (!res.ok) {
+    throw new OsuApiError(`The osu! API could not validate credentials (HTTP ${res.status}).`, res.status);
+  }
+
+  const body: unknown = await res.json();
+  if (
+    !isRecord(body) ||
+    typeof body["access_token"] !== "string" ||
+    typeof body["expires_in"] !== "number"
+  ) {
+    throw new OsuApiError("The osu! API returned an unexpected authentication response.");
+  }
+  return {
+    token: body["access_token"],
+    expiresAt: Date.now() + body["expires_in"] * 1000,
+  };
+}
+
+export async function verifyApiCredentials(clientId: string, clientSecret: string): Promise<void> {
+  await requestAccessToken(clientId, clientSecret);
+}
+
+async function getAccessToken(signal?: AbortSignal): Promise<string> {
+  const config = await loadConfig();
+  const clientId = config.osuApiClientId || process.env.OSU_API_CLIENT_ID;
+  const clientSecret = config.osuApiClientSecret || process.env.OSU_API_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new OsuApiError("osu! API credentials are not configured. Open Settings to add them.");
+  }
+
+  if (cache && cache.expiresAt > Date.now() + 10_000) return cache.token;
+  cache = await requestAccessToken(clientId, clientSecret, signal);
+  return cache.token;
 }
 
 export class OsuApiError extends Error {
@@ -64,50 +105,77 @@ export class OsuApiError extends Error {
   }
 }
 
-interface RawSearchResponse {
-  beatmapsets?: BeatmapsetSummary[];
-  cursor_string?: string;
+function parseBeatmap(value: unknown): BeatmapDifficulty | null {
+  if (
+    !isRecord(value) ||
+    typeof value["id"] !== "number" ||
+    typeof value["version"] !== "string" ||
+    typeof value["mode"] !== "string" ||
+    typeof value["difficulty_rating"] !== "number"
+  ) {
+    return null;
+  }
+  return {
+    id: value["id"],
+    version: value["version"],
+    mode: value["mode"],
+    difficulty_rating: value["difficulty_rating"],
+  };
 }
 
-// Numeric ranges (stars, bpm, etc) are read out of the free-text `q`
-// string, same as the website's own search bar. Cursor-based pagination.
-export async function searchBeatmapsets(filters: SearchFilters): Promise<{
+function parseBeatmapset(value: unknown): BeatmapsetSummary | null {
+  if (
+    !isRecord(value) ||
+    typeof value["id"] !== "number" ||
+    typeof value["title"] !== "string" ||
+    typeof value["artist"] !== "string" ||
+    typeof value["creator"] !== "string" ||
+    typeof value["status"] !== "string" ||
+    !Array.isArray(value["beatmaps"])
+  ) {
+    return null;
+  }
+  const covers = isRecord(value["covers"]) ? value["covers"] : {};
+  return {
+    id: value["id"],
+    title: value["title"],
+    artist: value["artist"],
+    creator: value["creator"],
+    status: value["status"],
+    covers: { card: typeof covers["card"] === "string" ? covers["card"] : undefined },
+    beatmaps: value["beatmaps"].map(parseBeatmap).filter((beatmap) => beatmap !== null),
+  };
+}
+
+export async function searchBeatmapsets(filters: SearchFilters, signal?: AbortSignal): Promise<{
   beatmapsets: BeatmapsetSummary[];
   cursorString: string | null;
 }> {
-  const token = await getAccessToken();
-  if (!token) {
-    throw new OsuApiError("osu! API credentials are not configured (OSU_API_CLIENT_ID/SECRET in .env).");
+  const token = await getAccessToken(signal);
+  const url = buildSearchUrl(filters);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: requestSignal(signal, 30_000),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new OsuApiError("The osu! search request timed out. Try again.");
+    }
+    throw new OsuApiError("Could not reach the osu! API. Check your connection and try again.");
   }
-
-  const qParts: string[] = [];
-  if (filters.query.trim()) qParts.push(filters.query.trim());
-  const range = (field: string, min: string, max: string): void => {
-    if (min.trim()) qParts.push(`${field}>=${min.trim()}`);
-    if (max.trim()) qParts.push(`${field}<=${max.trim()}`);
-  };
-  range("stars", filters.starsMin, filters.starsMax);
-  range("bpm", filters.bpmMin, filters.bpmMax);
-  range("length", filters.lengthMin, filters.lengthMax);
-  range("ar", filters.arMin, filters.arMax);
-  range("cs", filters.csMin, filters.csMax);
-  range("od", filters.odMin, filters.odMax);
-  range("dr", filters.hpMin, filters.hpMax);
-
-  const url = new URL("https://osu.ppy.sh/api/v2/beatmapsets/search");
-  if (qParts.length) url.searchParams.set("q", qParts.join(" "));
-  if (filters.mode) url.searchParams.set("m", filters.mode);
-  // "any" means "don't filter by status" -> omit `s` entirely rather than
-  // sending an invalid value the API wouldn't recognize.
-  if (filters.status !== "any") url.searchParams.set("s", filters.status);
-  if (filters.cursorString) url.searchParams.set("cursor_string", filters.cursorString);
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  });
   if (!res.ok) {
     throw new OsuApiError(`osu! API returned ${res.status} for beatmapset search`, res.status);
   }
-  const body = (await res.json()) as RawSearchResponse;
-  return { beatmapsets: body.beatmapsets ?? [], cursorString: body.cursor_string ?? null };
+  const body: unknown = await res.json();
+  if (!isRecord(body)) throw new OsuApiError("The osu! API returned an unexpected search response.");
+  const beatmapsets = Array.isArray(body["beatmapsets"])
+    ? body["beatmapsets"].map(parseBeatmapset).filter((set) => set !== null)
+    : [];
+  return {
+    beatmapsets,
+    cursorString: typeof body["cursor_string"] === "string" ? body["cursor_string"] : null,
+  };
 }

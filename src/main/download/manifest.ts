@@ -1,6 +1,7 @@
 // Flat JSON "already downloaded" tracker, kept next to the output folder.
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { displayPath, isMissingFile, isRecord, writeJsonAtomic } from "../json-file";
 
 interface ManifestEntry {
   downloadedAt: string;
@@ -18,11 +19,34 @@ function manifestPath(outDir: string): string {
   return path.join(outDir, ".beatmap-downloader-manifest.json");
 }
 
+export function parseManifest(value: unknown): Manifest {
+  if (!isRecord(value)) return {};
+  const manifest: Manifest = {};
+  for (const [id, entry] of Object.entries(value)) {
+    const numericId = Number(id);
+    if (
+      !Number.isSafeInteger(numericId) ||
+      numericId <= 0 ||
+      !isRecord(entry) ||
+      typeof entry["downloadedAt"] !== "string" ||
+      typeof entry["path"] !== "string"
+    ) {
+      continue;
+    }
+    manifest[id] = { downloadedAt: entry["downloadedAt"], path: entry["path"] };
+  }
+  return manifest;
+}
+
 export async function loadManifest(outDir: string): Promise<Manifest> {
+  const filePath = manifestPath(outDir);
   try {
-    const raw = await fs.readFile(manifestPath(outDir), "utf-8");
-    return JSON.parse(raw) as Manifest;
-  } catch {
+    const raw = await fs.readFile(filePath, "utf8");
+    return parseManifest(JSON.parse(raw));
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      console.warn(`[manifest] could not read ${displayPath(filePath)}; rebuilding it`);
+    }
     return {};
   }
 }
@@ -33,7 +57,7 @@ export async function recordDownload(outDir: string, beatmapsetId: number, fileP
   const current = previous.catch(() => undefined).then(async () => {
     const manifest = await loadManifest(outDir);
     manifest[String(beatmapsetId)] = { downloadedAt: new Date().toISOString(), path: filePath };
-    await fs.writeFile(target, JSON.stringify(manifest, null, 2), "utf-8");
+    await writeJsonAtomic(target, manifest);
   });
 
   pendingWrites.set(target, current);
