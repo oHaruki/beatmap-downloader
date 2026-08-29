@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { DownloadJob, DownloadProgressEvent } from "@shared/types";
+import type { DownloadJob, DownloadProgressEvent, OsuFolderSelection } from "@shared/types";
 import { parseSearchFilters, validateSearchFilters } from "@shared/search-filters";
 import {
   hasApiCredentials,
@@ -10,7 +10,11 @@ import {
   searchBeatmapsets,
   verifyApiCredentials,
 } from "./osu/api";
-import { findDefaultSongsFolder, listInstalledBeatmapsets } from "./osu/songs-folder";
+import {
+  findDefaultOsuFolder,
+  listInstalledBeatmapsets,
+  resolveOsuFolder,
+} from "./osu/songs-folder";
 import { executeImportPlan, planAutoImport, type ImportOutcome } from "./osu/auto-import-executor";
 import { importPlanForFile } from "./osu/auto-import";
 import { runDownloadQueue } from "./download/queue";
@@ -91,21 +95,62 @@ async function configuredOutputFolder(requested: unknown): Promise<string> {
   return configured;
 }
 
-async function configuredSongsFolder(requested: unknown): Promise<string> {
-  const requestedFolder = requiredString(requested, "Songs folder");
-  const configured = (await loadConfig()).songsFolder;
-  if (!configured || !samePath(requestedFolder, configured)) {
-    throw new TypeError("The Songs folder is not configured.");
+async function loadOsuFolderSelection(): Promise<OsuFolderSelection | null> {
+  const config = await loadConfig();
+  const candidates = [
+    config.osuFolder,
+    config.songsFolder ? path.dirname(config.songsFolder) : null,
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    try {
+      const selection = await resolveOsuFolder(candidate);
+      if (
+        !config.osuFolder ||
+        !config.songsFolder ||
+        !samePath(config.osuFolder, selection.osuFolder) ||
+        !samePath(config.songsFolder, selection.songsFolder)
+      ) {
+        await saveConfig(selection);
+      }
+      return selection;
+    } catch {
+      // Try the detected default before asking the user to choose again.
+    }
+  }
+
+  const detected = await findDefaultOsuFolder();
+  if (detected) await saveConfig(detected);
+  return detected;
+}
+
+async function configuredOsuFolders(
+  requestedOsuFolder: unknown,
+  requestedSongsFolder: unknown,
+): Promise<OsuFolderSelection> {
+  const osuFolder = requiredString(requestedOsuFolder, "osu! folder");
+  const songsFolder = requiredString(requestedSongsFolder, "Songs folder");
+  const configured = await loadOsuFolderSelection();
+  if (
+    !configured ||
+    !samePath(osuFolder, configured.osuFolder) ||
+    !samePath(songsFolder, configured.songsFolder)
+  ) {
+    throw new TypeError("The osu! folder is not configured.");
   }
   return configured;
 }
 
 async function buildAutoImportContext(): Promise<AutoImportContext | null> {
-  const config = await loadConfig();
-  const songsFolder = config.songsFolder ?? (await findDefaultSongsFolder());
-  if (!songsFolder) return null;
+  const selection = await loadOsuFolderSelection();
+  if (!selection) return null;
 
-  const planPromise = planAutoImport(songsFolder, [], process.env.LOCALAPPDATA);
+  const planPromise = planAutoImport(
+    selection.songsFolder,
+    [],
+    process.env.LOCALAPPDATA,
+    selection.osuFolder,
+  );
   return {
     async run(file: string): Promise<ImportOutcome> {
       const base = await planPromise;
@@ -180,25 +225,30 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     }
   });
 
-  ipcMain.handle("get-songs-folder", async () => {
-    const config = await loadConfig();
-    if (config.songsFolder) return config.songsFolder;
-    const found = await findDefaultSongsFolder();
-    if (found) await saveConfig({ songsFolder: found });
-    return found;
-  });
+  ipcMain.handle("get-osu-folder", () => loadOsuFolderSelection());
 
-  ipcMain.handle("choose-songs-folder", async () => {
+  ipcMain.handle("choose-osu-folder", async () => {
     const win = getWindow();
     if (!win) return null;
-    const result = await dialog.showOpenDialog(win, { properties: ["openDirectory"] });
+    const current = await loadOsuFolderSelection();
+    const result = await dialog.showOpenDialog(win, {
+      title: "Choose your osu! installation folder",
+      buttonLabel: "Select osu! folder",
+      defaultPath: current?.osuFolder,
+      properties: ["openDirectory"],
+    });
     if (result.canceled || result.filePaths.length === 0) return null;
-    await saveConfig({ songsFolder: result.filePaths[0] });
-    return result.filePaths[0];
+    const selection = await resolveOsuFolder(result.filePaths[0]);
+    await saveConfig(selection);
+    return selection;
   });
 
-  ipcMain.handle("get-installed-beatmapset-ids", async (_event, requested: unknown) =>
-    listInstalledBeatmapsets(await configuredSongsFolder(requested)),
+  ipcMain.handle(
+    "get-installed-beatmapset-ids",
+    async (_event, requestedOsuFolder: unknown, requestedSongsFolder: unknown) => {
+      const selection = await configuredOsuFolders(requestedOsuFolder, requestedSongsFolder);
+      return listInstalledBeatmapsets(selection.songsFolder, selection.osuFolder);
+    },
   );
 
   ipcMain.handle("get-auto-import-enabled", async () => (await loadConfig()).autoImportEnabled);
@@ -277,9 +327,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return shell.openPath(directory);
   });
 
-  ipcMain.handle("open-songs-folder", async () => {
-    const directory = (await loadConfig()).songsFolder;
-    return directory ? shell.openPath(directory) : "Songs folder is not configured.";
+  ipcMain.handle("open-osu-folder", async () => {
+    const selection = await loadOsuFolderSelection();
+    return selection ? shell.openPath(selection.osuFolder) : "osu! folder is not configured.";
   });
 
   ipcMain.on("window-minimize", () => getWindow()?.minimize());

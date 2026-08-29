@@ -4,6 +4,7 @@ import type {
   DownloadProgressEvent,
   CredentialSaveResult,
   InstalledSongsScan,
+  OsuFolderSelection,
   RendererApi,
   SearchFilters,
   SearchResult,
@@ -21,12 +22,15 @@ const api: RendererApi = {
 
   getDownloadedIds: (outDir: string): Promise<number[]> => ipcRenderer.invoke("get-downloaded-ids", outDir),
 
-  getSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("get-songs-folder"),
+  getOsuFolder: (): Promise<OsuFolderSelection | null> => ipcRenderer.invoke("get-osu-folder"),
 
-  chooseSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-songs-folder"),
+  chooseOsuFolder: (): Promise<OsuFolderSelection | null> => ipcRenderer.invoke("choose-osu-folder"),
 
-  getInstalledBeatmapsetIds: (songsFolder: string): Promise<InstalledSongsScan> =>
-    ipcRenderer.invoke("get-installed-beatmapset-ids", songsFolder),
+  getInstalledBeatmapsetIds: (
+    osuFolder: string,
+    songsFolder: string,
+  ): Promise<InstalledSongsScan> =>
+    ipcRenderer.invoke("get-installed-beatmapset-ids", osuFolder, songsFolder),
 
   hasApiCredentials: (): Promise<boolean> => ipcRenderer.invoke("has-api-credentials"),
 
@@ -49,7 +53,7 @@ const api: RendererApi = {
 
   openOutputFolder: (): Promise<string> => ipcRenderer.invoke("open-output-folder"),
 
-  openSongsFolder: (): Promise<string> => ipcRenderer.invoke("open-songs-folder"),
+  openOsuFolder: (): Promise<string> => ipcRenderer.invoke("open-osu-folder"),
 
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: DownloadProgressEvent): void =>

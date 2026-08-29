@@ -20,7 +20,6 @@ import {
   type ResultsOwnershipFilter,
 } from "./results-filter";
 
-const PAGES_PER_LOAD = 3;
 const PAGE_DELAY_MS = 150;
 const LARGE_BATCH_SIZE = 100;
 
@@ -45,15 +44,14 @@ export default function App() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasCompletedSearch, setHasCompletedSearch] = useState(false);
   const [pagesFetched, setPagesFetched] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const cancelSearchRef = useRef(false);
   const searchInFlightRef = useRef(false);
-  const searchFiltersRef = useRef<SearchFilters>(DEFAULT_SEARCH_FILTERS);
   const filterVersionRef = useRef(0);
   const installedScanRef = useRef(false);
 
   const [outputFolder, setOutputFolder] = useState<string | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<number>>(new Set());
+  const [osuFolder, setOsuFolder] = useState<string | null>(null);
   const [songsFolder, setSongsFolder] = useState<string | null>(null);
   const [installedIds, setInstalledIds] = useState<Set<number>>(new Set());
   const [installedSource, setInstalledSource] = useState<InstalledSongsScan["source"] | null>(null);
@@ -76,9 +74,12 @@ export default function App() {
       .then(setOutputFolder)
       .catch((error) => setAppError(errorMessage(error, "Could not prepare the output folder.")));
     void window.api
-      .getSongsFolder()
-      .then(setSongsFolder)
-      .catch((error) => setAppError(errorMessage(error, "Could not detect the osu! Songs folder.")));
+      .getOsuFolder()
+      .then((selection) => {
+        setOsuFolder(selection?.osuFolder ?? null);
+        setSongsFolder(selection?.songsFolder ?? null);
+      })
+      .catch((error) => setAppError(errorMessage(error, "Could not detect the osu! folder.")));
     void window.api
       .getAutoImportEnabled()
       .then(setAutoImport)
@@ -99,15 +100,15 @@ export default function App() {
   }, [outputFolder]);
 
   useEffect(() => {
-    if (songsFolder) void refreshInstalledIds(songsFolder);
-  }, [songsFolder]);
+    if (osuFolder && songsFolder) void refreshInstalledIds(osuFolder, songsFolder);
+  }, [osuFolder, songsFolder]);
 
   useEffect(() => {
-    if (!songsFolder) return;
-    const onFocus = (): void => void refreshInstalledIds(songsFolder);
+    if (!osuFolder || !songsFolder) return;
+    const onFocus = (): void => void refreshInstalledIds(osuFolder, songsFolder);
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [songsFolder]);
+  }, [osuFolder, songsFolder]);
 
   useEffect(
     () =>
@@ -117,15 +118,15 @@ export default function App() {
     [],
   );
 
-  async function refreshInstalledIds(folder: string): Promise<void> {
+  async function refreshInstalledIds(osuRoot: string, songs: string): Promise<void> {
     if (installedScanRef.current) return;
     installedScanRef.current = true;
     try {
-      const scan = await window.api.getInstalledBeatmapsetIds(folder);
+      const scan = await window.api.getInstalledBeatmapsetIds(osuRoot, songs);
       setInstalledIds(new Set(scan.ids));
       setInstalledSource(scan.source);
     } catch (error) {
-      setAppError(errorMessage(error, "Could not scan the osu! Songs folder."));
+      setAppError(errorMessage(error, "Could not scan the osu! folder."));
     } finally {
       installedScanRef.current = false;
     }
@@ -139,12 +140,14 @@ export default function App() {
     }
   }
 
-  async function handleChooseSongsFolder(): Promise<void> {
+  async function handleChooseOsuFolder(): Promise<void> {
     try {
-      const folder = await window.api.chooseSongsFolder();
-      if (folder) setSongsFolder(folder);
+      const selection = await window.api.chooseOsuFolder();
+      if (!selection) return;
+      setOsuFolder(selection.osuFolder);
+      setSongsFolder(selection.songsFolder);
     } catch (error) {
-      setAppError(errorMessage(error, "Could not save the Songs folder."));
+      setAppError(errorMessage(error, "Could not use that osu! folder."));
     }
   }
 
@@ -189,38 +192,33 @@ export default function App() {
       ? { text: "searching", tone: "busy" as const }
       : { text: "ready", tone: "ok" as const };
 
-  async function loadSearchPages(append: boolean): Promise<void> {
+  async function loadAllSearchPages(): Promise<void> {
     if (searchInFlightRef.current) return;
     const validationError = validateSearchFilters(filters);
     if (validationError) {
       setSearchError(validationError);
       return;
     }
-    if (append && !nextCursor) return;
-
     searchInFlightRef.current = true;
     cancelSearchRef.current = false;
     setSearchLoading(true);
     setSearchError(null);
     const filterVersion = filterVersionRef.current;
-    const basePage = append ? pagesFetched : 0;
-    if (!append) {
-      searchFiltersRef.current = { ...filters, cursorString: null };
-      setHasCompletedSearch(false);
-      setResults([]);
-      setSelected(new Set());
-      setPagesFetched(0);
-      setNextCursor(null);
-      setOwnershipFilter("all");
-    }
+    const searchFilters = { ...filters, cursorString: null };
+    setHasCompletedSearch(false);
+    setResults([]);
+    setSelected(new Set());
+    setPagesFetched(0);
+    setOwnershipFilter("all");
 
-    let cursorString = append ? nextCursor : null;
+    let cursorString: string | null = null;
     let fetchedPages = 0;
     let cancelled = false;
+    const seenCursors = new Set<string>();
     try {
-      while (fetchedPages < PAGES_PER_LOAD && !cancelSearchRef.current) {
+      while (!cancelSearchRef.current) {
         const result = await window.api.searchBeatmapsets({
-          ...searchFiltersRef.current,
+          ...searchFilters,
           cursorString,
         });
         if (result.cancelled) {
@@ -239,21 +237,23 @@ export default function App() {
           return next;
         });
         fetchedPages += 1;
-        setPagesFetched(basePage + fetchedPages);
-        cursorString = result.cursorString;
+        setPagesFetched(fetchedPages);
         if (filterVersion !== filterVersionRef.current) {
-          setNextCursor(null);
           break;
         }
-        setNextCursor(cursorString);
 
-        if (!cursorString || result.beatmapsets.length === 0) break;
-        if (fetchedPages < PAGES_PER_LOAD) {
-          await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY_MS));
+        const nextCursor = result.cursorString;
+        if (!nextCursor) break;
+        if (seenCursors.has(nextCursor)) {
+          setSearchError("Search stopped because osu! returned a repeated page cursor.");
+          return;
         }
+        seenCursors.add(nextCursor);
+        cursorString = nextCursor;
+        await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY_MS));
       }
       cancelled ||= cancelSearchRef.current;
-      if (!append && !cancelled && filterVersion === filterVersionRef.current) {
+      if (!cancelled && filterVersion === filterVersionRef.current) {
         setHasCompletedSearch(true);
       }
     } catch (error) {
@@ -265,7 +265,7 @@ export default function App() {
   }
 
   function handleSearch(): void {
-    void loadSearchPages(false);
+    void loadAllSearchPages();
   }
 
   function handleCancelSearch(): void {
@@ -305,10 +305,10 @@ export default function App() {
     }
   }
 
-  async function handleOpenFolder(kind: "output" | "songs"): Promise<void> {
+  async function handleOpenFolder(kind: "output" | "osu"): Promise<void> {
     try {
       const error =
-        kind === "output" ? await window.api.openOutputFolder() : await window.api.openSongsFolder();
+        kind === "output" ? await window.api.openOutputFolder() : await window.api.openOsuFolder();
       if (error) setAppError(error);
     } catch (error) {
       setAppError(errorMessage(error, "Could not open the folder."));
@@ -353,7 +353,9 @@ export default function App() {
       setDownloading(false);
       setCancelDownloadRequested(false);
       await refreshDownloadedIds(outputFolder);
-      if (autoImport && songsFolder) await refreshInstalledIds(songsFolder);
+      if (autoImport && osuFolder && songsFolder) {
+        await refreshInstalledIds(osuFolder, songsFolder);
+      }
     }
   }
 
@@ -425,9 +427,10 @@ export default function App() {
         outputFolder={outputFolder}
         onChooseOutputFolder={handleChooseFolder}
         onOpenOutputFolder={() => void handleOpenFolder("output")}
+        osuFolder={osuFolder}
         songsFolder={songsFolder}
-        onChooseSongsFolder={handleChooseSongsFolder}
-        onOpenSongsFolder={() => void handleOpenFolder("songs")}
+        onChooseOsuFolder={handleChooseOsuFolder}
+        onOpenOsuFolder={() => void handleOpenFolder("osu")}
         installedCount={installedIds.size}
         installedSource={installedSource}
         forceRedownload={forceRedownload}
@@ -443,13 +446,11 @@ export default function App() {
             onChange={(nextFilters) => {
               filterVersionRef.current += 1;
               setFilters(nextFilters);
-              setNextCursor(null);
             }}
             onSearch={handleSearch}
             onReset={() => {
               filterVersionRef.current += 1;
               setFilters(DEFAULT_SEARCH_FILTERS);
-              setNextCursor(null);
             }}
             loading={searchLoading}
           />
@@ -473,21 +474,15 @@ export default function App() {
           )}
           {searchLoading && (
             <p className="search-status">
-              Searching... {results.length} maps found so far ({pagesFetched} pages)
+              Searching... {results.length} maps found so far ({pagesFetched}{" "}
+              {pagesFetched === 1 ? "page" : "pages"})
               <button onClick={handleCancelSearch}>Cancel</button>
             </p>
           )}
           {!searchLoading && results.length > 0 && (
-            <div className="results-status-row">
-              <p className="search-status">
-                {results.length} maps shown, {remainingInResults} you do not have yet.
-              </p>
-              {nextCursor && (
-                <button type="button" onClick={() => void loadSearchPages(true)}>
-                  Load more
-                </button>
-              )}
-            </div>
+            <p className="search-status">
+              {results.length} maps found, {remainingInResults} you do not have yet.
+            </p>
           )}
 
           <OwnershipFilterBar

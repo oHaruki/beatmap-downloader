@@ -9,9 +9,10 @@ interface Props {
   outputFolder: string | null;
   onChooseOutputFolder: () => void;
   onOpenOutputFolder: () => void;
+  osuFolder: string | null;
   songsFolder: string | null;
-  onChooseSongsFolder: () => void;
-  onOpenSongsFolder: () => void;
+  onChooseOsuFolder: () => void;
+  onOpenOsuFolder: () => void;
   installedCount: number;
   installedSource: InstalledSongsScan["source"] | null;
   forceRedownload: boolean;
@@ -32,9 +33,10 @@ export function DownloadBar({
   outputFolder,
   onChooseOutputFolder,
   onOpenOutputFolder,
+  osuFolder,
   songsFolder,
-  onChooseSongsFolder,
-  onOpenSongsFolder,
+  onChooseOsuFolder,
+  onOpenOsuFolder,
   installedCount,
   installedSource,
   forceRedownload,
@@ -70,24 +72,25 @@ export function DownloadBar({
       <div className="toolbar-folder-group">
         <button
           className="toolbar-folder"
-          onClick={onChooseSongsFolder}
+          onClick={onChooseOsuFolder}
           title={
-            songsFolder
-              ? `${songsFolder}
+            osuFolder && songsFolder
+              ? `${osuFolder}
+Maps are checked and imported through ${songsFolder}
 ${installedCount} sets detected via ${installedSource ?? "..."}`
-              : "Choose your osu! Songs folder so owned maps are skipped"
+              : "Choose the folder that contains osu!.exe; its Songs folder is handled automatically"
           }
         >
-          <span className="toolbar-folder-label">osu! Songs</span>
+          <span className="toolbar-folder-label">osu! folder</span>
           <span className="toolbar-folder-path">
-            {songsFolder ? `${installedCount} maps` : "not set"}
+            {osuFolder ? tail(osuFolder) : "not set"}
           </span>
         </button>
         <button
           className="toolbar-folder-open"
-          onClick={onOpenSongsFolder}
-          disabled={!songsFolder}
-          title="Open osu! Songs folder"
+          onClick={onOpenOsuFolder}
+          disabled={!osuFolder}
+          title="Open osu! folder"
         >
           Open
         </button>

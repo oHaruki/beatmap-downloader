@@ -60,18 +60,20 @@ renderer processes, runs the test suite, and verifies a production build.
 ## How it works
 
 - Searching and filtering goes through the official osu! API v2.
-- Searches fetch three pages at a time. Use **Load more** to continue a broad
-  search, or cancel it without losing the results already found.
+- Searches keep loading pages until every matching map has been found. You can
+  cancel a broad search without losing the results already loaded.
 - The actual `.osz` files come from a mirror cascade (Nekoha, then Nerinyan,
   then Beatconnect), since osu.ppy.sh requires a real logged-in session for
   direct downloads. Files are streamed to temporary `.part` files and only
   moved into place after validation, so an interrupted download cannot look
   complete. Failed or cancelled items can be retried from the download panel.
-- Maps you already have are detected and skipped automatically. Ownership
-  is read from `osu!.db` (osu!'s own index, which knows the real beatmapset
-  id no matter what a folder is named) unioned with a scan of the Songs
-  folder itself, plus anything downloaded through this app before. osu! only
-  rewrites `osu!.db` when it exits, so the Songs folder is rescanned
+- Choose the osu! installation folder that contains `osu!.exe`; the app resolves
+  its configured `Songs` directory automatically for ownership checks and
+  imports. Maps you already have are detected and skipped automatically.
+  Ownership is read from `osu!.db` (osu!'s own index, which knows the real
+  beatmapset id no matter what a folder is named) unioned with a scan of the
+  Songs folder itself, plus anything downloaded through this app before. osu!
+  only rewrites `osu!.db` when it exits, so the Songs folder is rescanned
   whenever the window regains focus — import in osu!, alt-tab back, done.
 - The app currently targets osu!stable only.
 

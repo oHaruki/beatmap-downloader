@@ -39,22 +39,28 @@ export function findStableExecutable(
 function defaultStableCandidates(
   localAppData: string | undefined,
   songsFolder: string,
+  osuFolder?: string,
 ): string[] {
   const configuredCandidate = path.join(path.dirname(songsFolder), "osu!.exe");
   const defaultCandidates = localAppData
     ? [path.join(localAppData, "osu!", "osu!.exe")]
     : [];
-  return [configuredCandidate, ...defaultCandidates];
+  return [
+    ...(osuFolder ? [path.join(osuFolder, "osu!.exe")] : []),
+    configuredCandidate,
+    ...defaultCandidates,
+  ];
 }
 
 export async function planAutoImport(
   songsFolder: string,
   files: string[],
   localAppData: string | undefined,
+  osuFolder?: string,
   probe: ProcessProbe = { existsSync: fileExists },
 ): Promise<ImportPlan> {
   const stableExecutable = findStableExecutable(
-    defaultStableCandidates(localAppData, songsFolder),
+    defaultStableCandidates(localAppData, songsFolder, osuFolder),
     probe,
   );
   return buildImportPlan(songsFolder, files, stableExecutable);

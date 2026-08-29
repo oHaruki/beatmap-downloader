@@ -8,6 +8,7 @@ import { displayPath, isMissingFile, isRecord, writeJsonAtomic } from "./json-fi
 
 export interface AppConfig {
   outputFolder: string | null;
+  osuFolder: string | null;
   songsFolder: string | null;
   osuApiClientId: string | null;
   osuApiClientSecret: string | null;
@@ -16,6 +17,7 @@ export interface AppConfig {
 
 const DEFAULT_CONFIG: AppConfig = {
   outputFolder: null,
+  osuFolder: null,
   songsFolder: null,
   osuApiClientId: null,
   osuApiClientSecret: null,
@@ -46,6 +48,7 @@ export function parseAppConfig(value: unknown): AppConfig {
   if (!isRecord(value)) return { ...DEFAULT_CONFIG };
   return {
     outputFolder: nullableString(value["outputFolder"]),
+    osuFolder: nullableString(value["osuFolder"]),
     songsFolder: nullableString(value["songsFolder"]),
     osuApiClientId: nullableString(value["osuApiClientId"]),
     osuApiClientSecret: nullableString(value["osuApiClientSecret"]),

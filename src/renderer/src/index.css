@@ -584,18 +584,6 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.results-status-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.results-status-row .search-status {
-  margin: 0;
-}
-
-.results-status-row button,
 .error-text button {
   padding: 4px 8px;
   font-size: 11.5px;

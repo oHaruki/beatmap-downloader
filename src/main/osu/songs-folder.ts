@@ -8,10 +8,10 @@
 //                loose "<id>.osz". Sees fresh imports immediately, but is
 //                blind to folders renamed by hand or predating the id
 //                convention.
-import { promises as fs } from "fs";
-import path from "path";
-import os from "os";
-import type { InstalledSongsScan } from "@shared/types";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { InstalledSongsScan, OsuFolderSelection } from "@shared/types";
 import { readOsuDb } from "./osu-db";
 
 // "12345 Artist - Title", "12345", "12345.osz", "12345 - Title". The id must
@@ -84,24 +84,47 @@ async function isDirectory(target: string): Promise<boolean> {
   }
 }
 
-export async function findDefaultSongsFolder(): Promise<string | null> {
-  const installRoot = path.join(localAppDataDir(), "osu!");
-  const defaultSongs = path.join(installRoot, "Songs");
+async function isFile(target: string): Promise<boolean> {
+  try {
+    return (await fs.stat(target)).isFile();
+  } catch {
+    return false;
+  }
+}
 
-  // A custom BeatmapDirectory wins over the default Songs folder, but only
-  // if it actually exists on disk.
+export async function resolveOsuFolder(selectedFolder: string): Promise<OsuFolderSelection> {
+  const selected = path.resolve(selectedFolder);
+  const installRoot =
+    path.basename(selected).toLowerCase() === "songs" ? path.dirname(selected) : selected;
+  if (!(await isFile(path.join(installRoot, "osu!.exe")))) {
+    throw new Error("Choose the osu! folder that contains osu!.exe.");
+  }
+
   const override = await readBeatmapDirectoryOverride(installRoot);
-  if (override && (await isDirectory(override))) return override;
+  const songsFolder =
+    override && (await isDirectory(override)) ? override : path.join(installRoot, "Songs");
+  if (!(await isDirectory(songsFolder))) {
+    throw new Error("The selected osu! folder does not contain its configured Songs folder.");
+  }
 
-  return (await isDirectory(defaultSongs)) ? defaultSongs : null;
+  return { osuFolder: installRoot, songsFolder };
+}
+
+export async function findDefaultOsuFolder(): Promise<OsuFolderSelection | null> {
+  try {
+    return await resolveOsuFolder(path.join(localAppDataDir(), "osu!"));
+  } catch {
+    return null;
+  }
 }
 
 // osu!.db lives in the install root, which is NOT reliably the parent of the
 // Songs folder: BeatmapDirectory can point at another drive entirely. Probe
 // the parent (the default layout, and what picking "<install>\Songs" in the
 // folder dialog gives) before the default install location.
-async function findOsuDb(songsFolder: string): Promise<string | null> {
+async function findOsuDb(songsFolder: string, osuFolder?: string): Promise<string | null> {
   const candidates = [
+    ...(osuFolder ? [path.join(osuFolder, "osu!.db")] : []),
     path.join(songsFolder, "..", "osu!.db"),
     path.join(localAppDataDir(), "osu!", "osu!.db"),
   ];
@@ -135,8 +158,11 @@ async function listIdsFromSongsFolder(songsFolder: string): Promise<number[]> {
   }
 }
 
-export async function listInstalledBeatmapsets(songsFolder: string): Promise<InstalledSongsScan> {
-  const osuDbPath = await findOsuDb(songsFolder);
+export async function listInstalledBeatmapsets(
+  songsFolder: string,
+  osuFolder?: string,
+): Promise<InstalledSongsScan> {
+  const osuDbPath = await findOsuDb(songsFolder, osuFolder);
   const [osuDb, folderIds] = await Promise.all([
     osuDbPath ? readOsuDb(osuDbPath) : Promise.resolve(null),
     listIdsFromSongsFolder(songsFolder),

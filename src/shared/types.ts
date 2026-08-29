@@ -64,6 +64,11 @@ export interface DownloadProgressEvent {
 
 export type CredentialSaveResult = { ok: true } | { ok: false; error: string };
 
+export interface OsuFolderSelection {
+  osuFolder: string;
+  songsFolder: string;
+}
+
 /** Result of scanning an osu!stable install for installed beatmapsets. */
 export interface InstalledSongsScan {
   ids: number[];
@@ -82,9 +87,12 @@ export interface RendererApi {
   chooseOutputFolder: () => Promise<string | null>;
   getOutputFolder: () => Promise<string>;
   getDownloadedIds: (outDir: string) => Promise<number[]>;
-  getSongsFolder: () => Promise<string | null>;
-  chooseSongsFolder: () => Promise<string | null>;
-  getInstalledBeatmapsetIds: (songsFolder: string) => Promise<InstalledSongsScan>;
+  getOsuFolder: () => Promise<OsuFolderSelection | null>;
+  chooseOsuFolder: () => Promise<OsuFolderSelection | null>;
+  getInstalledBeatmapsetIds: (
+    osuFolder: string,
+    songsFolder: string,
+  ) => Promise<InstalledSongsScan>;
   hasApiCredentials: () => Promise<boolean>;
   setApiCredentials: (clientId: string, clientSecret: string) => Promise<CredentialSaveResult>;
   startDownload: (
@@ -97,7 +105,7 @@ export interface RendererApi {
   getAutoImportEnabled: () => Promise<boolean>;
   setAutoImportEnabled: (enabled: boolean) => Promise<boolean>;
   openOutputFolder: () => Promise<string>;
-  openSongsFolder: () => Promise<string>;
+  openOsuFolder: () => Promise<string>;
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void) => () => void;
   windowMinimize: () => void;
   windowToggleMaximize: () => void;
