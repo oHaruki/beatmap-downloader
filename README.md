@@ -8,9 +8,9 @@
 <a href="LICENSE"><img src="https://img.shields.io/github/license/oHaruki/beatmap-downloader" alt="License"></a>
 </p>
 
-Filter by star rating, mode, status, BPM, length, AR, CS, OD, and HP drain
-through the official osu! API, then pull the actual files through a mirror
-cascade.
+Filter by star rating, mode, status (ranked through WIP and graveyard), BPM,
+length, AR, CS, OD, and HP drain through the official osu! API, then pull
+the actual files through a mirror cascade.
 
 ## Early build, expect rough edges
 
@@ -18,11 +18,10 @@ This is a very early build, put together quickly. If something breaks or
 looks wrong, please open an issue on the
 [Issues page](https://github.com/oHaruki/beatmap-downloader/issues).
 
-The mirrors this relies on (Nekoha, Nerinyan, Beatconnect) are
-community-run, not something this project controls. They can be slow, rate
-limit you, or go down for a while. The app backs off and falls back between
-them, but if all three are having a bad day at once, downloads will fail
-until they recover.
+The mirrors this relies on (Nerinyan, Beatconnect) are community-run, not
+something this project controls. They can be slow, rate limit you, or go
+down for a while. The app backs off and falls back between them, but if both
+are having a bad day at once, downloads will fail until they recover.
 
 ## Quick start
 
@@ -54,8 +53,8 @@ window if you prefer.
 ## How it works
 
 - Searching and filtering goes through the official osu! API v2.
-- The actual `.osz` files come from a mirror cascade (Nekoha, then Nerinyan,
-  then Beatconnect), since osu.ppy.sh requires a real logged-in session for
+- The actual `.osz` files come from a mirror cascade (Nerinyan, then
+  Beatconnect), since osu.ppy.sh requires a real logged-in session for
   direct downloads.
 - Maps you already have are detected and skipped automatically. Ownership
   is read from `osu!.db` (osu!'s own index, which knows the real beatmapset
