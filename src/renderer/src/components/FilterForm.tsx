@@ -8,6 +8,7 @@ import {
   IconClock,
   IconHeart,
   IconGrave,
+  IconPencil,
   IconTarget,
   IconDrum,
   IconDrop,
@@ -29,6 +30,8 @@ const STATUS_OPTIONS: { value: BeatmapStatus; label: string; icon: React.ReactNo
   { value: "qualified", label: "Qualified", icon: <IconClock /> },
   { value: "loved", label: "Loved", icon: <IconHeart /> },
   { value: "pending", label: "Pending", icon: <IconClock /> },
+  // Separate osu! category, not covered by "pending".
+  { value: "wip", label: "WIP", icon: <IconPencil /> },
   { value: "graveyard", label: "Graveyard", icon: <IconGrave /> },
 ];
 

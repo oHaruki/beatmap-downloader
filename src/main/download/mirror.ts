@@ -2,13 +2,12 @@
 // instead. Tried in order; {id} is the beatmapset id.
 //
 // catboy.best was dropped: it now returns 403 for every set.
+// nekoha was dropped: it still serves ranked sets, but 404s on anything
+// unranked or recently submitted, which is most of what an unranked or WIP
+// search returns.
 // beatconnect is last because it rate limits aggressively (429, and a JSON
 // error body rather than a file once it does).
-const MIRRORS = [
-  "https://mirror.nekoha.moe/api/download/{id}",
-  "https://api.nerinyan.moe/d/{id}",
-  "https://beatconnect.io/b/{id}",
-];
+const MIRRORS = ["https://api.nerinyan.moe/d/{id}", "https://beatconnect.io/b/{id}"];
 
 const UA = "beatmap-downloader/0.1 (+https://github.com/)";
 
