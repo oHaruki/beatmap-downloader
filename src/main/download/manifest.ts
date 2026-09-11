@@ -2,6 +2,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { displayPath, isMissingFile, isRecord, writeJsonAtomic } from "../json-file";
+import type { DownloadHistoryEntry } from "../../shared/types";
 
 interface ManifestEntry {
   downloadedAt: string;
@@ -70,9 +71,18 @@ export async function recordDownload(outDir: string, beatmapsetId: number, fileP
 }
 
 export async function listDownloadedIds(outDir: string): Promise<number[]> {
+  return (await listDownloadHistory(outDir)).filter((entry) => entry.exists).map((entry) => entry.beatmapsetId).sort((a, b) => a - b);
+}
+
+export async function listDownloadHistory(outDir: string): Promise<DownloadHistoryEntry[]> {
   const manifest = await loadManifest(outDir);
-  return Object.keys(manifest)
-    .map(Number)
-    .filter((id) => Number.isSafeInteger(id) && id > 0)
-    .sort((left, right) => left - right);
+  const files = new Set((await fs.readdir(outDir, { withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => entry.name.toLowerCase()));
+  return Object.entries(manifest).map(([id, entry]) => {
+    const name = path.basename(entry.path);
+    return {
+      beatmapsetId: Number(id), downloadedAt: entry.downloadedAt,
+      fileName: name.replace(/^\d+\s*/, "").replace(/\.osz$/i, ""),
+      path: path.join(outDir, name), exists: files.has(name.toLowerCase()),
+    };
+  }).sort((a, b) => b.downloadedAt.localeCompare(a.downloadedAt));
 }

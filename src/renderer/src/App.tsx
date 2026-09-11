@@ -14,6 +14,7 @@ import { OwnershipFilterBar } from "./components/OwnershipFilterBar";
 import { ResultsList } from "./components/ResultsList";
 import { SettingsModal } from "./components/SettingsModal";
 import { TitleBar } from "./components/TitleBar";
+import { HistoryPanel } from "./components/HistoryPanel";
 import {
   applyResultsFilter,
   retainVisibleSelections,
@@ -62,6 +63,7 @@ export default function App() {
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
   const [batchTotal, setBatchTotal] = useState(0);
   const [lastBatchJobs, setLastBatchJobs] = useState<DownloadJob[]>([]);
+  const [lastBatchForce, setLastBatchForce] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [appError, setAppError] = useState<string | null>(null);
   const [ownershipFilter, setOwnershipFilter] = useState<ResultsOwnershipFilter>("all");
@@ -104,16 +106,19 @@ export default function App() {
   }, [osuFolder, songsFolder]);
 
   useEffect(() => {
-    if (!osuFolder || !songsFolder) return;
-    const onFocus = (): void => void refreshInstalledIds(osuFolder, songsFolder);
+    const onFocus = (): void => {
+      if (osuFolder && songsFolder) void refreshInstalledIds(osuFolder, songsFolder);
+      if (outputFolder && !downloading) void refreshDownloadedIds(outputFolder);
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [osuFolder, songsFolder]);
+  }, [osuFolder, songsFolder, outputFolder, downloading]);
 
   useEffect(
     () =>
       window.api.onDownloadProgress((event) => {
         setProgress((previous) => new Map(previous).set(event.beatmapsetId, event));
+        if (event.status === "done") setDownloadedIds((previous) => new Set(previous).add(event.beatmapsetId));
       }),
     [],
   );
@@ -154,8 +159,9 @@ export default function App() {
   const labels = useMemo(() => {
     const map = new Map<number, string>();
     for (const set of results) map.set(set.id, `${set.artist} - ${set.title}`);
+    for (const job of lastBatchJobs) map.set(job.beatmapsetId, job.fileName);
     return map;
-  }, [results]);
+  }, [results, lastBatchJobs]);
 
   const remainingInResults = results.filter(
     (set) => !installedIds.has(set.id) && !downloadedIds.has(set.id),
@@ -326,7 +332,7 @@ export default function App() {
     }
   }
 
-  async function startBatch(jobs: DownloadJob[]): Promise<void> {
+  async function startBatch(jobs: DownloadJob[], force = forceRedownload): Promise<void> {
     if (!outputFolder || jobs.length === 0 || downloading) return;
     if (jobs.length > 1_000) {
       setDownloadError("A batch can contain at most 1,000 beatmapsets. Select fewer maps and try again.");
@@ -345,8 +351,9 @@ export default function App() {
     setProgress(new Map());
     setBatchTotal(jobs.length);
     setLastBatchJobs(jobs);
+    setLastBatchForce(force);
     try {
-      await window.api.startDownload(jobs, outputFolder, forceRedownload, [...installedIds]);
+      await window.api.startDownload(jobs, outputFolder, force, [...installedIds]);
     } catch (error) {
       setDownloadError(errorMessage(error, "The download batch could not be completed."));
     } finally {
@@ -384,7 +391,7 @@ export default function App() {
         .filter((event) => event.status === "error" || event.status === "cancelled")
         .map((event) => event.beatmapsetId),
     );
-    void startBatch(lastBatchJobs.filter((job) => retryableIds.has(job.beatmapsetId)));
+    void startBatch(lastBatchJobs.filter((job) => retryableIds.has(job.beatmapsetId)), lastBatchForce);
   }
 
   const downloadLabel = downloading
@@ -417,6 +424,7 @@ export default function App() {
         <span>{statusLine.text}</span>
       </div>
       <DownloadBar
+        busy={downloading}
         label={downloadLabel}
         canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
         onDownload={handleDownload}
@@ -457,6 +465,7 @@ export default function App() {
         </aside>
 
         <main className="main-panel">
+          <HistoryPanel downloading={downloading} outputFolder={outputFolder} onRepair={(jobs) => void startBatch(jobs, true)} />
           {appError && (
             <p className="error-text" role="alert">
               {appError} <button onClick={() => setAppError(null)}>Dismiss</button>
@@ -512,6 +521,10 @@ export default function App() {
             retryableCount={retryableCount}
             onCancel={handleCancelDownload}
             onRetry={handleRetryFailed}
+            onExport={() => {
+              const ids = [...progress.values()].filter((event) => event.status === "error" || event.status === "cancelled").map((event) => event.beatmapsetId);
+              void window.api.exportFailedIds(ids).catch((error) => setAppError(errorMessage(error, "Could not export IDs.")));
+            }}
           />
         </main>
       </div>

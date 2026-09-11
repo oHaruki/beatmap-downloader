@@ -18,6 +18,10 @@ export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
   odMax: "",
   hpMin: "",
   hpMax: "",
+  sort: "",
+  keys: "",
+  rankedFrom: "",
+  rankedTo: "",
 };
 
 export const SEARCH_RANGE_FILTERS = [
@@ -65,6 +69,7 @@ const STATUSES = new Set<SearchFilters["status"]>([
   "qualified",
   "loved",
   "pending",
+  "wip",
   "graveyard",
 ]);
 
@@ -96,12 +101,23 @@ export function parseSearchFilters(value: unknown): SearchFilters | null {
   }
 
   const cursor = value["cursorString"];
+  for (const key of ["sort", "keys", "rankedFrom", "rankedTo"] as const) {
+    if (value[key] !== undefined && typeof value[key] !== "string") return null;
+    parsed[key] = typeof value[key] === "string" ? value[key] : "";
+  }
   if (cursor !== undefined && cursor !== null && typeof cursor !== "string") return null;
   if (typeof cursor === "string" || cursor === null) parsed.cursorString = cursor;
   return parsed;
 }
 
 export function validateSearchFilters(filters: SearchFilters): string | null {
+  if (!["", "relevance_desc", "ranked_desc", "ranked_asc", "title_asc", "artist_asc", "difficulty_asc", "difficulty_desc", "plays_desc", "favourites_desc"].includes(filters.sort ?? "")) return "Choose a valid sort order.";
+  if (!["", "4", "7"].includes(filters.keys ?? "")) return "Choose 4K or 7K.";
+  if (filters.keys && filters.mode !== "3") return "Key count is only available for Mania.";
+  for (const date of [filters.rankedFrom, filters.rankedTo]) {
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) return "Choose a valid ranked date.";
+  }
+  if (filters.rankedFrom && filters.rankedTo && filters.rankedFrom > filters.rankedTo) return "The ranked start date must be before the end date.";
   for (const spec of SEARCH_RANGE_FILTERS) {
     const minimumText = filters[spec.minKey].trim();
     const maximumText = filters[spec.maxKey].trim();

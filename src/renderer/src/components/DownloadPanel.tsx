@@ -9,6 +9,7 @@ interface Props {
   retryableCount: number;
   onCancel: () => void;
   onRetry: () => void;
+  onExport: () => void;
 }
 
 export function DownloadPanel({
@@ -20,6 +21,7 @@ export function DownloadPanel({
   retryableCount,
   onCancel,
   onRetry,
+  onExport,
 }: Props) {
   if (total === 0) return null;
 
@@ -55,6 +57,7 @@ export function DownloadPanel({
       </div>
 
       <div className="download-actions">
+        {retryableCount > 0 && <button onClick={onExport}>Export unfinished IDs</button>}
         {downloading && (
           <button type="button" onClick={onCancel} disabled={cancelling}>
             {cancelling ? "Cancelling..." : "Cancel batch"}

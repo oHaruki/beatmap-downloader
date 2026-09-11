@@ -26,6 +26,10 @@ export interface SearchFilters {
   hpMin: string;
   hpMax: string;
   cursorString?: string | null;
+  sort?: string;
+  keys?: string;
+  rankedFrom?: string;
+  rankedTo?: string;
 }
 
 export interface BeatmapDifficulty {
@@ -33,6 +37,12 @@ export interface BeatmapDifficulty {
   version: string;
   mode: string;
   difficulty_rating: number;
+  bpm?: number;
+  total_length?: number;
+  ar?: number;
+  cs?: number;
+  accuracy?: number;
+  drain?: number;
 }
 
 export interface BeatmapsetSummary {
@@ -43,6 +53,15 @@ export interface BeatmapsetSummary {
   status: string;
   covers: { card?: string };
   beatmaps: BeatmapDifficulty[];
+  preview_url?: string;
+}
+
+export interface SearchPreset { name: string; filters: SearchFilters }
+export interface CredentialSettings { clientId: string; hasSecret: boolean; remember: boolean }
+export interface DownloadHistoryEntry extends DownloadJob {
+  downloadedAt: string;
+  path: string;
+  exists: boolean;
 }
 
 export interface SearchResult {
@@ -101,7 +120,14 @@ export interface RendererApi {
     songsFolder: string,
   ) => Promise<InstalledSongsScan>;
   hasApiCredentials: () => Promise<boolean>;
-  setApiCredentials: (clientId: string, clientSecret: string) => Promise<CredentialSaveResult>;
+  getCredentialSettings: () => Promise<CredentialSettings>;
+  setApiCredentials: (clientId: string, clientSecret: string, remember: boolean) => Promise<CredentialSaveResult>;
+  forgetApiCredentials: () => Promise<void>;
+  getSearchPresets: () => Promise<SearchPreset[]>;
+  saveSearchPresets: (presets: SearchPreset[]) => Promise<SearchPreset[]>;
+  getDownloadHistory: () => Promise<DownloadHistoryEntry[]>;
+  revealDownload: (id: number) => Promise<void>;
+  exportFailedIds: (ids: number[]) => Promise<boolean>;
   startDownload: (
     jobs: DownloadJob[],
     outDir: string,

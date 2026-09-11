@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DownloadJob, DownloadProgressEvent } from "@shared/types";
 import { downloadFromMirrorToFile, type MirrorDownloadOptions } from "./mirror";
-import { loadManifest, recordDownload } from "./manifest";
+import { listDownloadedIds, recordDownload } from "./manifest";
 
 const CONCURRENCY = 3;
 const STAGGER_MS = 250;
@@ -84,8 +84,7 @@ export async function runDownloadQueue(
   const jobs = uniqueJobs(options.jobs);
   const download = deps.download ?? downloadFromMirrorToFile;
   await fs.mkdir(options.outDir, { recursive: true });
-  const manifest = await loadManifest(options.outDir);
-  const downloaded = new Set(Object.keys(manifest).map(Number));
+  const downloaded = new Set(await listDownloadedIds(options.outDir));
   const installed = new Set(options.installedIds);
 
   for (const job of jobs) {

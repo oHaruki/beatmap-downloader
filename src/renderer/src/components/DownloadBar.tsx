@@ -2,6 +2,7 @@ import type { InstalledSongsScan } from "@shared/types";
 import { IconGear } from "./icons";
 
 interface Props {
+  busy: boolean;
   label: string;
   canDownload: boolean;
   onDownload: () => void;
@@ -26,6 +27,7 @@ function tail(p: string, max = 28): string {
 }
 
 export function DownloadBar({
+  busy,
   label,
   canDownload,
   onDownload,
@@ -54,6 +56,7 @@ export function DownloadBar({
         <button
           className="toolbar-folder"
           onClick={onChooseOutputFolder}
+          disabled={busy}
           title={outputFolder ?? "Choose where downloads are saved"}
         >
           <span className="toolbar-folder-label">Output</span>
@@ -73,6 +76,7 @@ export function DownloadBar({
         <button
           className="toolbar-folder"
           onClick={onChooseOsuFolder}
+          disabled={busy}
           title={
             osuFolder && songsFolder
               ? `${osuFolder}

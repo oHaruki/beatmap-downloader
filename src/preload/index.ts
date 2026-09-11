@@ -34,8 +34,15 @@ const api: RendererApi = {
 
   hasApiCredentials: (): Promise<boolean> => ipcRenderer.invoke("has-api-credentials"),
 
-  setApiCredentials: (clientId: string, clientSecret: string): Promise<CredentialSaveResult> =>
-    ipcRenderer.invoke("set-api-credentials", clientId, clientSecret),
+  getCredentialSettings: () => ipcRenderer.invoke("get-credential-settings"),
+  setApiCredentials: (clientId: string, clientSecret: string, remember: boolean): Promise<CredentialSaveResult> =>
+    ipcRenderer.invoke("set-api-credentials", clientId, clientSecret, remember),
+  forgetApiCredentials: () => ipcRenderer.invoke("forget-api-credentials"),
+  getSearchPresets: () => ipcRenderer.invoke("get-search-presets"),
+  saveSearchPresets: (presets) => ipcRenderer.invoke("save-search-presets", presets),
+  getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
+  revealDownload: (id) => ipcRenderer.invoke("reveal-download", id),
+  exportFailedIds: (ids) => ipcRenderer.invoke("export-failed-ids", ids),
 
   startDownload: (
     jobs: DownloadJob[],
