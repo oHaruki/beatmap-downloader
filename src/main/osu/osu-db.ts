@@ -170,9 +170,15 @@ export interface OsuDbScan {
  * Returns null (never throws) if the file is missing or doesn't parse, so the
  * caller can fall back to scanning folder names.
  */
+let cachedDb: { path: string; stamp: string; value: OsuDbScan } | null = null;
+
 export async function readOsuDb(osuDbPath: string): Promise<OsuDbScan | null> {
   let buf: Buffer;
+  let stamp: string;
   try {
+    const stat = await fs.stat(osuDbPath);
+    stamp = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+    if (cachedDb?.path === osuDbPath && cachedDb.stamp === stamp) return cachedDb.value;
     buf = await fs.readFile(osuDbPath);
   } catch {
     return null;
@@ -211,7 +217,9 @@ export async function readOsuDb(osuDbPath: string): Promise<OsuDbScan | null> {
       );
     }
 
-    return { setIds: [...setIds], beatmapCount, version };
+    const value = { setIds: [...setIds], beatmapCount, version };
+    cachedDb = { path: osuDbPath, stamp, value };
+    return value;
   } catch (e) {
     console.warn(`[osu!.db] falling back to folder names: ${e instanceof Error ? e.message : e}`);
     return null;

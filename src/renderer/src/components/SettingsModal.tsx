@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconClose } from "./icons";
 
 interface Props {
@@ -12,13 +12,36 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
   const [clientSecret, setClientSecret] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [remember, setRemember] = useState(false);
+  const [hasSecret, setHasSecret] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    dialog.current?.showModal();
+    void window.api.getCredentialSettings().then((settings) => {
+      setClientId(settings.clientId);
+      setHasSecret(settings.hasSecret);
+      setRemember(settings.remember);
+    }).catch((error) => setSaveError(error instanceof Error ? error.message : "Could not read credentials."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function forget(): Promise<void> {
+    setSaving(true);
+    try {
+      await window.api.forgetApiCredentials();
+      setClientId(""); setClientSecret(""); setHasSecret(false); setRemember(false); setSaveError(null);
+    } catch { setSaveError("Could not remove saved credentials. Please try again."); }
+    finally { setSaving(false); }
+  }
 
   async function handleSave(): Promise<void> {
-    if (!clientId.trim() || !clientSecret.trim()) return;
+    if (!clientId.trim() || (!clientSecret.trim() && !hasSecret)) return;
     setSaving(true);
     setSaveError(null);
     try {
-      const result = await window.api.setApiCredentials(clientId.trim(), clientSecret.trim());
+      const result = await window.api.setApiCredentials(clientId.trim(), clientSecret.trim(), remember);
       if (!result.ok) {
         setSaveError(result.error);
         return;
@@ -33,7 +56,7 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <dialog ref={dialog} className="settings-dialog" onCancel={(event) => { if (saving) event.preventDefault(); else onClose(); }}>
       <div
         className="modal"
         role="dialog"
@@ -43,7 +66,7 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
       >
         <div className="modal-header">
           <span id="settings-title">Settings</span>
-          <button className="modal-close" aria-label="Close settings" onClick={onClose}>
+          <button className="modal-close" aria-label="Close settings" onClick={onClose} disabled={saving}>
             <IconClose />
           </button>
         </div>
@@ -56,7 +79,7 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
 
         <label className="modal-field">
           <span className="field-label">Client ID</span>
-          <input type="text" value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="e.g. 12345" />
+          <input type="text" value={clientId} onChange={(e) => { setClientId(e.target.value); setHasSecret(false); }} placeholder="e.g. 12345" disabled={saving || loading} />
         </label>
 
         <label className="modal-field">
@@ -65,10 +88,19 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
             type="password"
             value={clientSecret}
             onChange={(e) => setClientSecret(e.target.value)}
-            placeholder="paste your client secret"
+            placeholder={hasSecret ? "Leave blank to keep the current secret" : "Paste your client secret"}
+            disabled={saving || loading}
           />
         </label>
 
+        <label className="remember-credentials">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} disabled={saving || loading} />
+          Remember on this PC
+        </label>
+        <p className="modal-note">
+          Saves your client ID and secret securely for this Windows account, even when you move or replace the app.
+          Uncheck and save to use them only until you close the app.
+        </p>
         <p className="modal-note">
           Register an OAuth app at{" "}
           <a href="https://osu.ppy.sh/home/account/edit" target="_blank" rel="noreferrer">
@@ -79,10 +111,11 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
 
         {saveError && <p className="error-text" role="alert">{saveError}</p>}
 
-        <button className="primary-button" onClick={handleSave} disabled={saving || !clientId.trim() || !clientSecret.trim()}>
+        <button className="primary-button" onClick={handleSave} disabled={saving || loading || !clientId.trim() || (!clientSecret.trim() && !hasSecret)}>
           {saving ? "Saving..." : "Save"}
         </button>
+        <button onClick={() => void forget()} disabled={saving || loading}>Forget saved credentials</button>
       </div>
-    </div>
+    </dialog>
   );
 }

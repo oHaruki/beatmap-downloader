@@ -1,7 +1,7 @@
 // osu! API v2 client (client-credentials grant), search/metadata only.
 
 import type { BeatmapDifficulty, BeatmapsetSummary, SearchFilters } from "@shared/types";
-import { loadConfig } from "../config";
+import { getCredentials } from "../credentials";
 import { isRecord } from "../json-file";
 import { buildSearchUrl } from "./search-query";
 
@@ -19,11 +19,8 @@ export function resetTokenCache(): void {
 }
 
 export async function hasApiCredentials(): Promise<boolean> {
-  const config = await loadConfig();
-  return Boolean(
-    (config.osuApiClientId || process.env.OSU_API_CLIENT_ID) &&
-      (config.osuApiClientSecret || process.env.OSU_API_CLIENT_SECRET)
-  );
+  const { clientId, clientSecret } = await getCredentials();
+  return Boolean(clientId && clientSecret);
 }
 
 function requestSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
@@ -83,9 +80,7 @@ export async function verifyApiCredentials(clientId: string, clientSecret: strin
 }
 
 async function getAccessToken(signal?: AbortSignal): Promise<string> {
-  const config = await loadConfig();
-  const clientId = config.osuApiClientId || process.env.OSU_API_CLIENT_ID;
-  const clientSecret = config.osuApiClientSecret || process.env.OSU_API_CLIENT_SECRET;
+  const { clientId, clientSecret } = await getCredentials();
   if (!clientId || !clientSecret) {
     throw new OsuApiError("osu! API credentials are not configured. Open Settings to add them.");
   }
@@ -120,6 +115,8 @@ function parseBeatmap(value: unknown): BeatmapDifficulty | null {
     version: value["version"],
     mode: value["mode"],
     difficulty_rating: value["difficulty_rating"],
+    ...Object.fromEntries(["bpm", "total_length", "ar", "cs", "accuracy", "drain"].flatMap((key) =>
+      typeof value[key] === "number" && Number.isFinite(value[key]) ? [[key, value[key]]] : [])),
   };
 }
 
@@ -144,6 +141,7 @@ function parseBeatmapset(value: unknown): BeatmapsetSummary | null {
     status: value["status"],
     covers: { card: typeof covers["card"] === "string" ? covers["card"] : undefined },
     beatmaps: value["beatmaps"].map(parseBeatmap).filter((beatmap) => beatmap !== null),
+    preview_url: typeof value["preview_url"] === "string" ? value["preview_url"] : undefined,
   };
 }
 
@@ -167,6 +165,8 @@ export async function searchBeatmapsets(filters: SearchFilters, signal?: AbortSi
     throw new OsuApiError("Could not reach the osu! API. Check your connection and try again.");
   }
   if (!res.ok) {
+    if (res.status === 401) { resetTokenCache(); throw new OsuApiError("Your osu! API session expired or was rejected. Try again or check Settings.", 401); }
+    if (res.status === 429) throw new OsuApiError("osu! is limiting search requests. Wait a moment, then search again.", 429);
     throw new OsuApiError(`osu! API returned ${res.status} for beatmapset search`, res.status);
   }
   const body: unknown = await res.json();

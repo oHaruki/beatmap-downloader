@@ -18,9 +18,10 @@ import {
 import { executeImportPlan, planAutoImport, type ImportOutcome } from "./osu/auto-import-executor";
 import { importPlanForFile } from "./osu/auto-import";
 import { runDownloadQueue } from "./download/queue";
-import { listDownloadedIds } from "./download/manifest";
+import { listDownloadedIds, listDownloadHistory } from "./download/manifest";
 import { getDefaultDownloadsFolder, loadConfig, saveConfig } from "./config";
 import { isRecord } from "./json-file";
+import { getCredentials, getCredentialSettings, storeCredentials, forgetCredentials } from "./credentials";
 
 const MAX_BATCH_JOBS = 1_000;
 const MAX_INSTALLED_IDS = 2_000_000;
@@ -259,13 +260,51 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   });
 
   ipcMain.handle("has-api-credentials", () => hasApiCredentials());
+  ipcMain.handle("get-credential-settings", () => getCredentialSettings());
+  ipcMain.handle("forget-api-credentials", async () => { await forgetCredentials(); resetTokenCache(); });
+  ipcMain.handle("get-search-presets", async () => (await loadConfig()).searchPresets);
+  ipcMain.handle("save-search-presets", async (_event, input: unknown) => {
+    if (!Array.isArray(input) || input.length > 50) throw new Error("You can save up to 50 presets.");
+    for (const preset of input) {
+      if (!isRecord(preset) || typeof preset.name !== "string" || !preset.name.trim() || preset.name.length > 80) throw new Error("Preset name is invalid.");
+      const filters = parseSearchFilters(preset.filters);
+      if (!filters || validateSearchFilters(filters)) throw new Error("Preset filters are invalid.");
+    }
+    return (await saveConfig({ searchPresets: input })).searchPresets;
+  });
+  ipcMain.handle("get-download-history", async () => {
+    const config = await loadConfig();
+    return listDownloadHistory(config.outputFolder ?? getDefaultDownloadsFolder());
+  });
+  ipcMain.handle("reveal-download", async (_event, id: unknown) => {
+    if (!Number.isSafeInteger(id)) throw new Error("Invalid beatmap ID.");
+    const config = await loadConfig();
+    const entry = (await listDownloadHistory(config.outputFolder ?? getDefaultDownloadsFolder())).find((entry) => entry.beatmapsetId === id);
+    if (!entry?.exists) throw new Error("The downloaded file is no longer in the output folder.");
+    shell.showItemInFolder(entry.path);
+  });
+  ipcMain.handle("export-failed-ids", async (_event, values: unknown) => {
+    const ids = parseInstalledIds(values);
+    const win = getWindow();
+    if (!win) return false;
+    const result = await dialog.showSaveDialog(win, { title: "Export unfinished beatmap IDs", defaultPath: "unfinished-beatmaps.txt", filters: [{ name: "Text", extensions: ["txt"] }] });
+    if (result.canceled || !result.filePath) return false;
+    await fs.writeFile(result.filePath, ids.join("\n") + "\n", "utf8");
+    return true;
+  });
 
-  ipcMain.handle("set-api-credentials", async (_event, clientIdValue: unknown, clientSecretValue: unknown) => {
+  ipcMain.handle("set-api-credentials", async (_event, clientIdValue: unknown, clientSecretValue: unknown, remember: unknown) => {
     try {
+      if (typeof remember !== "boolean") throw new Error("Choose whether to remember credentials.");
       const clientId = requiredString(clientIdValue, "Client ID", 200).trim();
-      const clientSecret = requiredString(clientSecretValue, "Client secret", 500).trim();
+      let clientSecret = typeof clientSecretValue === "string" ? clientSecretValue.trim() : "";
+      if (!clientSecret) {
+        const current = await getCredentials();
+        if (current.clientId === clientId) clientSecret = current.clientSecret;
+      }
+      requiredString(clientSecret, "Client secret", 500);
       await verifyApiCredentials(clientId, clientSecret);
-      await saveConfig({ osuApiClientId: clientId, osuApiClientSecret: clientSecret });
+      await storeCredentials(clientId, clientSecret, remember);
       resetTokenCache();
       return { ok: true } as const;
     } catch (error) {

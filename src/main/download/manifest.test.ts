@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { listDownloadedIds, recordDownload } from "./manifest.ts";
+import { listDownloadedIds, recordDownload, listDownloadHistory } from "./manifest.ts";
 
 async function withTempDirectory(run: (directory: string) => Promise<void>): Promise<void> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "beatmap-manifest-"));
@@ -46,6 +46,10 @@ describe("download manifest", () => {
         }),
       );
 
-      assert.deepEqual(await listDownloadedIds(directory), [123, 456]);
+      await fs.writeFile(path.join(directory, "123.osz"), "fixture");
+      assert.deepEqual(await listDownloadedIds(directory), [123]);
+      const history = await listDownloadHistory(directory);
+      assert.equal(history.find((entry) => entry.beatmapsetId === 456)?.exists, false);
+      assert.equal(history.find((entry) => entry.beatmapsetId === 123)?.exists, true);
     }));
 });

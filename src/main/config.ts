@@ -5,6 +5,8 @@ import { app } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { displayPath, isMissingFile, isRecord, writeJsonAtomic } from "./json-file";
+import { parseSearchFilters, validateSearchFilters } from "../shared/search-filters";
+import type { SearchPreset } from "../shared/types";
 
 export interface AppConfig {
   outputFolder: string | null;
@@ -13,6 +15,7 @@ export interface AppConfig {
   osuApiClientId: string | null;
   osuApiClientSecret: string | null;
   autoImportEnabled: boolean;
+  searchPresets: SearchPreset[];
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -22,6 +25,7 @@ const DEFAULT_CONFIG: AppConfig = {
   osuApiClientId: null,
   osuApiClientSecret: null,
   autoImportEnabled: false,
+  searchPresets: [],
 };
 
 function configDir(): string {
@@ -50,6 +54,11 @@ export function parseAppConfig(value: unknown): AppConfig {
     outputFolder: nullableString(value["outputFolder"]),
     osuFolder: nullableString(value["osuFolder"]),
     songsFolder: nullableString(value["songsFolder"]),
+    searchPresets: Array.isArray(value["searchPresets"]) ? value["searchPresets"].flatMap((preset) => {
+      if (!isRecord(preset) || typeof preset["name"] !== "string" || !preset["name"].trim()) return [];
+      const filters = parseSearchFilters(preset["filters"]);
+      return filters && !validateSearchFilters(filters) ? [{ name: preset["name"].trim().slice(0, 80), filters: { ...filters, cursorString: null } }] : [];
+    }).slice(0, 50) : [],
     osuApiClientId: nullableString(value["osuApiClientId"]),
     osuApiClientSecret: nullableString(value["osuApiClientSecret"]),
     autoImportEnabled:
