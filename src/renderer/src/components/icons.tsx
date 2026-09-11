@@ -51,6 +51,14 @@ export const IconGrave = (p: SVGProps<SVGSVGElement>) => (
   </Base>
 );
 
+// WIP: a map still being drafted.
+export const IconPencil = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <path d="M11.2 2.9l1.9 1.9-7 7-2.6.7.7-2.6z" />
+    <path d="M10 4.1l1.9 1.9" />
+  </Base>
+);
+
 export const IconTarget = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
     <circle cx="8" cy="8" r="5.5" />

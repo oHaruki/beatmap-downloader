@@ -1,7 +1,6 @@
 import { promises as fs } from "node:fs";
 
 const DEFAULT_MIRRORS = [
-  "https://mirror.nekoha.moe/api/download/{id}",
   "https://api.nerinyan.moe/d/{id}",
   "https://beatconnect.io/b/{id}",
 ] as const;

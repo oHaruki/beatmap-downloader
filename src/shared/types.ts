@@ -1,4 +1,11 @@
-export type BeatmapStatus = "any" | "ranked" | "qualified" | "loved" | "pending" | "graveyard";
+export type BeatmapStatus =
+  | "any"
+  | "ranked"
+  | "qualified"
+  | "loved"
+  | "pending"
+  | "wip"
+  | "graveyard";
 
 export interface SearchFilters {
   query: string;
