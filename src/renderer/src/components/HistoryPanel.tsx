@@ -28,7 +28,7 @@ export function HistoryPanel({ downloading, outputFolder, onRepair, onClose }: {
       <span className="meta">{entries.length} downloaded · {entries.length - missing.length} files here · {missing.length} missing archives</span>
       <label><input type="checkbox" checked={missingOnly} onChange={(e) => setMissingOnly(e.target.checked)} /> Missing only</label>
       <button onClick={() => void refresh()} disabled={loading || downloading}>Refresh</button>
-      {missing.length > 0 && <button disabled={downloading || loading} onClick={() => onRepair(missing.slice(0, 1000))}>Re-download {Math.min(missing.length, 1000)} missing</button>}
+      {missing.length > 0 && <button disabled={downloading || loading} onClick={() => onRepair(missing)}>Re-download {missing.length} missing</button>}
       <button className="icon-button" aria-label="Close download history" title="Close" onClick={onClose}><IconClose /></button>
     </div>
     <p className="meta">Repair restores archives to the output folder, including maps already installed in osu!.</p>

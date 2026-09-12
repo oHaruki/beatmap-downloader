@@ -23,7 +23,6 @@ import { isRecord } from "./json-file";
 import { getCredentials, getCredentialSettings, storeCredentials, forgetCredentials } from "./credentials";
 import { loadOsuFolderSelection, getOsuFolderSettings, setOsuFolderSettings, setOsuFolderSelection } from "./osu/folder-settings";
 
-const MAX_BATCH_JOBS = 1_000;
 const MAX_INSTALLED_IDS = 2_000_000;
 
 let activeSearchController: AbortController | null = null;
@@ -50,8 +49,8 @@ function samePath(left: string, right: string): boolean {
 }
 
 function parseDownloadJobs(value: unknown): DownloadJob[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_BATCH_JOBS) {
-    throw new TypeError(`A download batch must contain between 1 and ${MAX_BATCH_JOBS} maps.`);
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TypeError("A download batch must contain at least one map.");
   }
 
   const jobs: DownloadJob[] = [];
