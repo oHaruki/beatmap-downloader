@@ -173,10 +173,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   });
 
   ipcMain.handle("choose-output-folder", async () => {
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
     const win = getWindow();
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, { properties: ["openDirectory", "createDirectory"] });
     if (result.canceled || result.filePaths.length === 0) return null;
+    // The queue captured the old folder at start, so a batch that began while
+    // the picker was open would keep writing there.
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
     await saveConfig({ outputFolder: result.filePaths[0] });
     return result.filePaths[0];
   });

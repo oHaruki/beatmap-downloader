@@ -7,7 +7,7 @@ const DEFAULT_MIRRORS = [
   "https://beatconnect.io/b/{id}",
 ] as const;
 
-const USER_AGENT = "beatmap-downloader/0.3.1 (+https://github.com/oHaruki/beatmap-downloader)";
+const USER_AGENT = "beatmap-downloader/0.4.0 (+https://github.com/oHaruki/beatmap-downloader)";
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -21,6 +21,9 @@ export type ProgressCallback = (bytesDownloaded: number, totalBytes: number | nu
 export interface MirrorDownloadOptions {
   signal?: AbortSignal;
   onProgress?: ProgressCallback;
+  /** Called while every mirror is cooling down, so a stalled batch looks busy
+   *  rather than frozen. */
+  onWaiting?: (seconds: number) => void;
 }
 
 export interface MirrorDownloadDeps {
@@ -192,7 +195,9 @@ export async function downloadFromMirrorToFile(
     }
 
     if (soonestCooldown === null || attempt === 3) break;
-    await wait(Math.max(1, soonestCooldown - now()), options.signal);
+    const remaining = Math.max(1, soonestCooldown - now());
+    options.onWaiting?.(Math.ceil(remaining / 1000));
+    await wait(remaining, options.signal);
   }
   throw lastError ?? new Error("no download mirrors are available");
 }

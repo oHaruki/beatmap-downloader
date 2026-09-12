@@ -90,7 +90,7 @@ export function DownloadPanel({
                   {labels.get(event.beatmapsetId) ?? event.beatmapsetId}
                 </span>
                 <span className="progress-percent">
-                  {event.progressPercent != null ? `${event.progressPercent}%` : ""}
+                  {event.progressPercent != null ? `${event.progressPercent}%` : (event.message ?? "")}
                 </span>
               </div>
               <div className={`progress-bar-track${event.progressPercent == null ? " indeterminate" : ""}`}>
