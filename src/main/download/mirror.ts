@@ -7,7 +7,8 @@ const DEFAULT_MIRRORS = [
   "https://beatconnect.io/b/{id}",
 ] as const;
 
-const USER_AGENT = "beatmap-downloader/0.4.0 (+https://github.com/oHaruki/beatmap-downloader)";
+// Bump alongside package.json on every release.
+const USER_AGENT = "beatmap-downloader/0.4.1 (+https://github.com/oHaruki/beatmap-downloader)";
 const REQUEST_TIMEOUT_MS = 120_000;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
