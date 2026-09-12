@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { IconClose } from "./icons";
+import type { OsuFolderSelection, OsuFolderSettings } from "@shared/types";
 
 interface Props {
   onClose: () => void;
   onSaved: () => void;
   firstRun: boolean;
+  onFolderChanged: (selection: OsuFolderSelection | null) => void;
 }
 
-export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
+export function SettingsModal({ onClose, onSaved, firstRun, onFolderChanged }: Props) {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [saving, setSaving] = useState(false);
@@ -16,9 +18,20 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
   const [hasSecret, setHasSecret] = useState(false);
   const [loading, setLoading] = useState(true);
   const dialog = useRef<HTMLDialogElement>(null);
+  const [folderSettings, setFolderSettings] = useState<OsuFolderSettings>({ remember: false, autoDetect: false });
+  const [folder, setFolder] = useState<OsuFolderSelection | null>(null);
+  const [folderLoading, setFolderLoading] = useState(true);
+  const [folderSaving, setFolderSaving] = useState(false);
+  const [folderMessage, setFolderMessage] = useState("");
+  const [folderError, setFolderError] = useState("");
 
   useEffect(() => {
     dialog.current?.showModal();
+    void Promise.all([window.api.getOsuFolderSettings(), window.api.getOsuFolder()]).then(([preferences, selection]) => {
+      setFolderSettings(preferences);
+      setFolder(selection);
+    }).catch(() => setFolderError("Could not read osu! folder preferences."))
+      .finally(() => setFolderLoading(false));
     void window.api.getCredentialSettings().then((settings) => {
       setClientId(settings.clientId);
       setHasSecret(settings.hasSecret);
@@ -26,6 +39,18 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
     }).catch((error) => setSaveError(error instanceof Error ? error.message : "Could not read credentials."))
       .finally(() => setLoading(false));
   }, []);
+
+  async function updateFolder(choose = false): Promise<void> {
+    setFolderSaving(true); setFolderMessage(""); setFolderError("");
+    try {
+      const selection = choose ? await window.api.chooseOsuFolder() : await window.api.setOsuFolderSettings(folderSettings);
+      if (choose && !selection) return;
+      setFolder(selection);
+      onFolderChanged(selection);
+      if (!choose) setFolderMessage(selection ? "Folder preferences saved." : folderSettings.autoDetect ? "Preferences saved. No installation found; choose your osu! folder manually." : "Preferences saved. Choose a folder to use during this session.");
+    } catch (error) { setFolderError(error instanceof Error ? error.message : "Could not save folder preferences."); }
+    finally { setFolderSaving(false); }
+  }
 
   async function forget(): Promise<void> {
     setSaving(true);
@@ -56,7 +81,7 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
   }
 
   return (
-    <dialog ref={dialog} className="settings-dialog" onCancel={(event) => { if (saving) event.preventDefault(); else onClose(); }}>
+    <dialog ref={dialog} className="settings-dialog" onCancel={(event) => { if (saving || folderSaving) event.preventDefault(); else onClose(); }}>
       <div
         className="modal"
         role="dialog"
@@ -66,7 +91,7 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
       >
         <div className="modal-header">
           <span id="settings-title">Settings</span>
-          <button className="modal-close" aria-label="Close settings" onClick={onClose} disabled={saving}>
+          <button className="modal-close" aria-label="Close settings" onClick={onClose} disabled={saving || folderSaving}>
             <IconClose />
           </button>
         </div>
@@ -112,9 +137,28 @@ export function SettingsModal({ onClose, onSaved, firstRun }: Props) {
         {saveError && <p className="error-text" role="alert">{saveError}</p>}
 
         <button className="primary-button" onClick={handleSave} disabled={saving || loading || !clientId.trim() || (!clientSecret.trim() && !hasSecret)}>
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving..." : "Save credentials"}
         </button>
         <button onClick={() => void forget()} disabled={saving || loading}>Forget saved credentials</button>
+        <section className="folder-settings" aria-labelledby="folder-settings-title">
+          <strong id="folder-settings-title">osu! folder</strong>
+          <label className="remember-credentials">
+            <input type="checkbox" checked={folderSettings.remember} disabled={folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, remember: e.target.checked })} />
+            Remember my osu! folder on this PC
+          </label>
+          <label className="remember-credentials">
+            <input type="checkbox" checked={folderSettings.autoDetect} disabled={folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, autoDetect: e.target.checked })} />
+            Find osu! automatically at launch
+          </label>
+          <p className="modal-note">Uses your remembered location first. Automatic detection checks registered and common installations, including their configured Songs folder. These preferences survive portable app updates.</p>
+          {folder && <p className="folder-location">osu!: {folder.osuFolder}<br />Songs: {folder.songsFolder}</p>}
+          <div className="preset-actions">
+            <button onClick={() => void updateFolder(true)} disabled={folderLoading || folderSaving}>Choose folder</button>
+            <button onClick={() => void updateFolder()} disabled={folderLoading || folderSaving}>{folderSaving ? "Saving…" : "Save folder preferences"}</button>
+          </div>
+          {folderMessage && <p className="modal-note" role="status">{folderMessage}</p>}
+          {folderError && <p className="error-text" role="alert">{folderError}</p>}
+        </section>
       </div>
     </dialog>
   );

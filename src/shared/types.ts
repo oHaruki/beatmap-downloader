@@ -95,6 +95,11 @@ export interface OsuFolderSelection {
   songsFolder: string;
 }
 
+export interface OsuFolderSettings {
+  remember: boolean;
+  autoDetect: boolean;
+}
+
 /** Result of scanning an osu!stable install for installed beatmapsets. */
 export interface InstalledSongsScan {
   ids: number[];
@@ -114,6 +119,8 @@ export interface RendererApi {
   getOutputFolder: () => Promise<string>;
   getDownloadedIds: (outDir: string) => Promise<number[]>;
   getOsuFolder: () => Promise<OsuFolderSelection | null>;
+  getOsuFolderSettings: () => Promise<OsuFolderSettings>;
+  setOsuFolderSettings: (settings: OsuFolderSettings) => Promise<OsuFolderSelection | null>;
   chooseOsuFolder: () => Promise<OsuFolderSelection | null>;
   getInstalledBeatmapsetIds: (
     osuFolder: string,

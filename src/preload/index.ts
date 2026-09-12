@@ -23,6 +23,8 @@ const api: RendererApi = {
   getDownloadedIds: (outDir: string): Promise<number[]> => ipcRenderer.invoke("get-downloaded-ids", outDir),
 
   getOsuFolder: (): Promise<OsuFolderSelection | null> => ipcRenderer.invoke("get-osu-folder"),
+  getOsuFolderSettings: () => ipcRenderer.invoke("get-osu-folder-settings"),
+  setOsuFolderSettings: (settings) => ipcRenderer.invoke("set-osu-folder-settings", settings),
 
   chooseOsuFolder: (): Promise<OsuFolderSelection | null> => ipcRenderer.invoke("choose-osu-folder"),
 

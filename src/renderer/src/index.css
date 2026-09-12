@@ -856,6 +856,8 @@ button:disabled {
 
 .settings-dialog { padding: 0; border: 0; background: transparent; color: var(--text); max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); }
 .settings-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+.folder-settings { display: grid; gap: 12px; border-top: 1px solid var(--border); padding-top: 14px; margin-top: 8px; }
+.folder-location { font-size: 12px; overflow-wrap: anywhere; color: var(--text-dim); margin: 0; }
 .settings-dialog .modal { width: 430px; max-width: 100%; box-sizing: border-box; }
 .remember-credentials, .preset-actions { display: flex; align-items: center; gap: 8px; }
 .preset-controls { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
