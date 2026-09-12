@@ -62,9 +62,10 @@ Settings has two independent, opt-in folder preferences:
 
 - **Remember my osu! folder on this PC** restores the selected installation on
   the next launch, even after replacing the portable build.
-- **Find osu! automatically at launch** checks the registered osu! installation
-  and common Windows install locations when no remembered installation is
-  available. It reads osu!'s configuration to locate custom Songs directories.
+- **Find osu! automatically at launch** checks the registered osu! installation,
+  osu! Start Menu and Desktop shortcuts, and common install locations
+  (including `osu!` at the root of every drive) when no remembered installation
+  is available. It reads osu!'s configuration to locate custom Songs directories.
 
 Click **Save folder preferences**; no API credentials are needed to save these
 options. **Choose folder** accepts the installation folder or its standard
