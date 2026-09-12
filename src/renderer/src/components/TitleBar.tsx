@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { IconClose, IconMaximize, IconMinimize, IconRestore } from "./icons";
 import iconUrl from "../assets/icon.png";
 
-export function TitleBar() {
+interface Props {
+  status: { text: string; tone: "ok" | "busy" };
+}
+
+export function TitleBar({ status }: Props) {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -15,6 +19,10 @@ export function TitleBar() {
       <div className="titlebar-drag">
         <img src={iconUrl} alt="" className="titlebar-icon" />
         <span>beatmap-downloader</span>
+        <span className="titlebar-status" role="status">
+          <span className={`status-dot ${status.tone}`} />
+          {status.text}
+        </span>
       </div>
 
       <div className="titlebar-buttons">

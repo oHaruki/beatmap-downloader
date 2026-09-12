@@ -12,23 +12,11 @@ function Base(props: SVGProps<SVGSVGElement>) {
       strokeWidth="1.4"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
       {...props}
     />
   );
 }
-
-export const IconAny = (p: SVGProps<SVGSVGElement>) => (
-  <Base {...p}>
-    <circle cx="8" cy="8" r="5.5" strokeDasharray="2 2" />
-  </Base>
-);
-
-export const IconCheck = (p: SVGProps<SVGSVGElement>) => (
-  <Base {...p}>
-    <circle cx="8" cy="8" r="5.5" />
-    <path d="M5.3 8.2l1.8 1.8 3.6-3.8" />
-  </Base>
-);
 
 export const IconClock = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
@@ -37,57 +25,27 @@ export const IconClock = (p: SVGProps<SVGSVGElement>) => (
   </Base>
 );
 
-export const IconHeart = (p: SVGProps<SVGSVGElement>) => (
+export const IconPlay = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
-    <path d="M8 12.5S3 9.3 3 6.2C3 4.4 4.4 3 6.1 3 7 3 7.7 3.4 8 4c.3-.6 1-.9 1.9-1C11.6 3 13 4.4 13 6.2c0 3.1-5 6.3-5 6.3z" />
+    <path d="M5.5 3.8v8.4L12 8z" fill="currentColor" />
   </Base>
 );
 
-export const IconGrave = (p: SVGProps<SVGSVGElement>) => (
+export const IconStop = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
-    <path d="M4.5 13.5v-6a3.5 3.5 0 017 0v6" />
-    <path d="M3 13.5h10" />
-    <path d="M8 6v3M6.6 7.5h2.8" />
+    <rect x="4.5" y="4.5" width="7" height="7" rx="1" fill="currentColor" />
   </Base>
 );
 
-// WIP: a map still being drafted.
-export const IconPencil = (p: SVGProps<SVGSVGElement>) => (
+export const IconExternal = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
-    <path d="M11.2 2.9l1.9 1.9-7 7-2.6.7.7-2.6z" />
-    <path d="M10 4.1l1.9 1.9" />
+    <path d="M9.5 2.5h4v4M13.5 2.5 8 8M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" />
   </Base>
 );
 
-export const IconTarget = (p: SVGProps<SVGSVGElement>) => (
+export const IconFolder = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
-    <circle cx="8" cy="8" r="5.5" />
-    <circle cx="8" cy="8" r="2" />
-  </Base>
-);
-
-export const IconDrum = (p: SVGProps<SVGSVGElement>) => (
-  <Base {...p}>
-    <ellipse cx="8" cy="5.5" rx="5" ry="2.3" />
-    <path d="M3 5.5v4c0 1.3 2.2 2.3 5 2.3s5-1 5-2.3v-4" />
-  </Base>
-);
-
-export const IconDrop = (p: SVGProps<SVGSVGElement>) => (
-  <Base {...p}>
-    <path d="M8 2.5s4 4.6 4 7.4a4 4 0 11-8 0c0-2.8 4-7.4 4-7.4z" />
-  </Base>
-);
-
-export const IconBars = (p: SVGProps<SVGSVGElement>) => (
-  <Base {...p}>
-    <path d="M4 11V6M8 11V3M12 11V8" />
-  </Base>
-);
-
-export const IconFilter = (p: SVGProps<SVGSVGElement>) => (
-  <Base {...p}>
-    <path d="M2.5 3.5h11L9.5 8.3v4l-3 1.2v-5.2z" />
+    <path d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />
   </Base>
 );
 
