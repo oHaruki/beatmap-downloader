@@ -15,8 +15,10 @@ import { ResultsList } from "./components/ResultsList";
 import { SettingsModal } from "./components/SettingsModal";
 import { TitleBar } from "./components/TitleBar";
 import { HistoryPanel } from "./components/HistoryPanel";
+import { IconClock } from "./components/icons";
 import {
   applyResultsFilter,
+  countByOwnership,
   retainVisibleSelections,
   type ResultsOwnershipFilter,
 } from "./results-filter";
@@ -49,6 +51,7 @@ export default function App() {
   const searchInFlightRef = useRef(false);
   const filterVersionRef = useRef(0);
   const installedScanRef = useRef(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const [outputFolder, setOutputFolder] = useState<string | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<number>>(new Set());
@@ -69,6 +72,7 @@ export default function App() {
   const [ownershipFilter, setOwnershipFilter] = useState<ResultsOwnershipFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
   const [settingsFirstRun, setSettingsFirstRun] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     void window.api
@@ -163,9 +167,10 @@ export default function App() {
     return map;
   }, [results, lastBatchJobs]);
 
-  const remainingInResults = results.filter(
-    (set) => !installedIds.has(set.id) && !downloadedIds.has(set.id),
-  ).length;
+  const counts = useMemo(
+    () => countByOwnership(results, installedIds, downloadedIds),
+    [results, installedIds, downloadedIds],
+  );
   const visibleResults = useMemo(
     () => applyResultsFilter(results, ownershipFilter, installedIds, downloadedIds),
     [results, ownershipFilter, installedIds, downloadedIds],
@@ -177,6 +182,11 @@ export default function App() {
       return next.size === previous.size ? previous : next;
     });
   }, [visibleResults]);
+
+  const allVisibleSelected = visibleResults.length > 0 && visibleResults.every((set) => selected.has(set.id));
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = selected.size > 0 && !allVisibleSelected;
+  });
 
   const selectedRemaining = forceRedownload
     ? selected.size
@@ -405,11 +415,19 @@ export default function App() {
     ? "No maps match the selected ownership filter."
     : hasCompletedSearch
       ? "No beatmaps matched this search."
-      : "No results yet. Try a search above.";
+      : "No results yet. Set your filters and search.";
+
+  const renderAlert = (message: string | null, dismiss: () => void) =>
+    message && (
+      <p className="alert" role="alert">
+        <span>{message}</span>
+        <button onClick={dismiss}>Dismiss</button>
+      </p>
+    );
 
   return (
     <div className="app-shell">
-      <TitleBar />
+      <TitleBar status={statusLine} />
       {showSettings && (
         <SettingsModal
           onFolderChanged={(selection) => {
@@ -426,10 +444,6 @@ export default function App() {
           }}
         />
       )}
-      <div className="status-bar">
-        <span className={`status-dot ${statusLine.tone}`} />
-        <span>{statusLine.text}</span>
-      </div>
       <DownloadBar
         busy={downloading}
         label={downloadLabel}
@@ -472,42 +486,48 @@ export default function App() {
         </aside>
 
         <main className="main-panel">
-          <HistoryPanel downloading={downloading} outputFolder={outputFolder} onRepair={(jobs) => void startBatch(jobs, true)} />
-          {appError && (
-            <p className="error-text" role="alert">
-              {appError} <button onClick={() => setAppError(null)}>Dismiss</button>
-            </p>
-          )}
-          {searchError && (
-            <p className="error-text" role="alert">
-              {searchError}
-            </p>
-          )}
-          {downloadError && (
-            <p className="error-text" role="alert">
-              {downloadError}
-            </p>
-          )}
-          {searchLoading && (
-            <p className="search-status">
-              Searching... {results.length} maps found so far ({pagesFetched}{" "}
-              {pagesFetched === 1 ? "page" : "pages"})
-              <button onClick={handleCancelSearch}>Cancel</button>
-            </p>
-          )}
-          {!searchLoading && results.length > 0 && (
-            <p className="search-status">
-              {results.length} maps found, {remainingInResults} you do not have yet.
-            </p>
-          )}
+          {renderAlert(appError, () => setAppError(null))}
+          {renderAlert(searchError, () => setSearchError(null))}
+          {renderAlert(downloadError, () => setDownloadError(null))}
 
-          <OwnershipFilterBar
-            results={results}
-            installedIds={installedIds}
-            downloadedIds={downloadedIds}
-            value={ownershipFilter}
-            onChange={changeOwnershipFilter}
-          />
+          <div className="results-toolbar">
+            {visibleResults.length > 0 && (
+              <label className="select-all">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all visible results"
+                />
+                {selected.size} of {visibleResults.length} selected
+              </label>
+            )}
+            <div className="search-status">
+              <span className="search-status-text">
+                {searchLoading
+                  ? `Searching… ${results.length} found · ${pagesFetched} ${pagesFetched === 1 ? "page" : "pages"}`
+                  : results.length > 0
+                    ? `${results.length} found · ${counts.missing} missing · ${counts.installed} installed · ${counts.downloaded} downloaded`
+                    : ""}
+              </span>
+              {searchLoading && <button onClick={handleCancelSearch}>Cancel</button>}
+            </div>
+            {results.length > 0 && <OwnershipFilterBar value={ownershipFilter} onChange={changeOwnershipFilter} />}
+            <button className="toolbar-button" aria-pressed={showHistory} onClick={() => setShowHistory((open) => !open)}>
+              <IconClock />
+              History
+            </button>
+          </div>
+
+          {showHistory && (
+            <HistoryPanel
+              downloading={downloading}
+              outputFolder={outputFolder}
+              onRepair={(jobs) => void startBatch(jobs, true)}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
 
           <ResultsList
             results={visibleResults}
@@ -515,7 +535,6 @@ export default function App() {
             downloadedIds={downloadedIds}
             installedIds={installedIds}
             onToggle={toggleSelected}
-            onToggleAll={toggleSelectAll}
             emptyMessage={emptyResultsMessage}
           />
 

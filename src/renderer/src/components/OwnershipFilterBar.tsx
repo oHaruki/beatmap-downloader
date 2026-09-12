@@ -1,13 +1,6 @@
-import type { BeatmapsetSummary } from "@shared/types";
-import {
-  countByOwnership,
-  type ResultsOwnershipFilter,
-} from "../results-filter";
+import type { ResultsOwnershipFilter } from "../results-filter";
 
 interface Props {
-  results: BeatmapsetSummary[];
-  installedIds: Set<number>;
-  downloadedIds: Set<number>;
   value: ResultsOwnershipFilter;
   onChange: (value: ResultsOwnershipFilter) => void;
 }
@@ -30,35 +23,21 @@ const OPTIONS: Array<{
   },
 ];
 
-export function OwnershipFilterBar({
-  results,
-  installedIds,
-  downloadedIds,
-  value,
-  onChange,
-}: Props) {
-  if (results.length === 0) return null;
-
-  const counts = countByOwnership(results, installedIds, downloadedIds);
+export function OwnershipFilterBar({ value, onChange }: Props) {
   return (
-    <div className="ownership-filter" aria-label="Filter search results by ownership">
-      <div className="chip-row">
-        {OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            className={`chip${option.value === value ? " active" : ""}`}
-            title={option.title}
-            type="button"
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      <p className="search-status">
-        {counts.missing.toLocaleString()} missing · {counts.downloaded.toLocaleString()} downloaded ·{" "}
-        {counts.installed.toLocaleString()} installed
-      </p>
+    <div className="segmented" role="group" aria-label="Filter search results by ownership">
+      {OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          className={option.value === value ? "active" : undefined}
+          aria-pressed={option.value === value}
+          title={option.title}
+          type="button"
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { BeatmapsetSummary } from "@shared/types";
 import { useState } from "react";
+import { IconChevron, IconExternal, IconFolder, IconPlay, IconStop } from "./icons";
 
 interface Props {
   results: BeatmapsetSummary[];
@@ -7,7 +8,6 @@ interface Props {
   downloadedIds: Set<number>;
   installedIds: Set<number>;
   onToggle: (id: number) => void;
-  onToggleAll: () => void;
   emptyMessage: string;
 }
 
@@ -27,7 +27,6 @@ export function ResultsList({
   downloadedIds,
   installedIds,
   onToggle,
-  onToggleAll,
   emptyMessage,
 }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -35,29 +34,27 @@ export function ResultsList({
   const [error, setError] = useState("");
   if (results.length === 0) return <p className="empty-hint">{emptyMessage}</p>;
 
-  const allSelected = results.every((set) => selected.has(set.id));
   return (
-    <div className="results-wrap">
-      {error && <p className="error-text" role="alert">{error} <button onClick={() => setError("")}>Dismiss</button></p>}
-      <label className="select-all-row">
-        <input type="checkbox" checked={allSelected} onChange={onToggleAll} />
-        {allSelected ? "Deselect all" : "Select all"} ({selected.size}/{results.length})
-      </label>
+    <>
+      {error && <p className="alert" role="alert"><span>{error}</span><button onClick={() => setError("")}>Dismiss</button></p>}
       <div className="results-list">
         {results.map((set) => {
           const installed = installedIds.has(set.id);
           const downloaded = !installed && downloadedIds.has(set.id);
           const inputId = `beatmapset-${set.id}`;
+          const name = `${set.artist} - ${set.title}`;
+          const previewing = preview === set.id;
+          const open = expanded === set.id;
           return (
-            <div className={`result-row${installed || downloaded ? " downloaded" : ""}`} key={set.id}>
+            <div className={`result-row${installed || downloaded ? " owned" : ""}`} key={set.id}>
               <input
                 id={inputId}
                 type="checkbox"
                 checked={selected.has(set.id)}
                 onChange={() => onToggle(set.id)}
-                aria-label={`Select ${set.artist} - ${set.title}`}
+                aria-label={`Select ${name}`}
               />
-              {set.covers.card && (
+              {set.covers.card ? (
                 <img
                   className="result-cover"
                   src={set.covers.card}
@@ -65,31 +62,59 @@ export function ResultsList({
                   loading="lazy"
                   referrerPolicy="no-referrer"
                 />
+              ) : (
+                <span className="result-cover" />
               )}
               <label className="result-details" htmlFor={inputId}>
-                <span className="result-title">
-                  {set.artist} - {set.title}
-                </span>
+                <span className="result-title">{name}</span>
                 <span className="meta">
                   by {set.creator} · {set.status} · {starRange(set)}
+                  {installed && <span className="owned-badge">installed</span>}
+                  {downloaded && <span className="owned-badge">downloaded here</span>}
                 </span>
               </label>
-              {installed && <span className="downloaded-badge">✓ installed</span>}
-              {downloaded && <span className="downloaded-badge">✓ downloaded here</span>}
-              <a
-                className="result-link"
-                href={`https://osu.ppy.sh/beatmapsets/${set.id}`}
-                target="_blank"
-                rel="noreferrer"
-                title="Open this beatmapset on osu!"
-              >
-                View
-              </a>
-              <button aria-expanded={expanded === set.id} onClick={() => setExpanded(expanded === set.id ? null : set.id)}>Details</button>
-              <button aria-label={preview === set.id ? "Stop preview" : `Preview ${set.title}`} onClick={() => { setError(""); setPreview(preview === set.id ? null : set.id); }}>{preview === set.id ? "Stop" : "Preview"}</button>
-              {downloadedIds.has(set.id) && <button onClick={() => void window.api.revealDownload(set.id).catch(() => setError("This file is no longer in the output folder. Open download history to repair it."))}>Show file</button>}
-              {preview === set.id && <audio className="beatmap-preview" controls autoPlay preload="none" src={`https://b.ppy.sh/preview/${set.id}.mp3`} onError={() => { setError("Audio preview is unavailable for this beatmap."); setPreview(null); }} onEnded={() => setPreview(null)} />}
-              {expanded === set.id && <div className="difficulty-details">
+              <div className="row-actions">
+                <button
+                  className="icon-button"
+                  aria-pressed={previewing}
+                  aria-label={previewing ? `Stop preview of ${set.title}` : `Preview ${set.title}`}
+                  title={previewing ? "Stop preview" : "Preview"}
+                  onClick={() => { setError(""); setPreview(previewing ? null : set.id); }}
+                >
+                  {previewing ? <IconStop /> : <IconPlay />}
+                </button>
+                <button
+                  className="icon-button"
+                  aria-expanded={open}
+                  aria-label={`Difficulties of ${name}`}
+                  title="Difficulties"
+                  onClick={() => setExpanded(open ? null : set.id)}
+                >
+                  <IconChevron className={`chevron${open ? " open" : ""}`} />
+                </button>
+                <a
+                  className="icon-button"
+                  href={`https://osu.ppy.sh/beatmapsets/${set.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${name} on osu!`}
+                  title="Open on osu!"
+                >
+                  <IconExternal />
+                </a>
+                {downloadedIds.has(set.id) && (
+                  <button
+                    className="icon-button"
+                    aria-label={`Show the downloaded file of ${name}`}
+                    title="Show file"
+                    onClick={() => void window.api.revealDownload(set.id).catch(() => setError("This file is no longer in the output folder. Open download history to repair it."))}
+                  >
+                    <IconFolder />
+                  </button>
+                )}
+              </div>
+              {previewing && <div className="preview-row"><audio className="beatmap-preview" controls autoPlay preload="none" src={`https://b.ppy.sh/preview/${set.id}.mp3`} onError={() => { setError("Audio preview is unavailable for this beatmap."); setPreview(null); }} onEnded={() => setPreview(null)} /></div>}
+              {open && <div className="difficulty-details">
                 <p className="meta">The download contains the whole beatmapset. All included difficulties:</p>
                 <table><thead><tr><th>Difficulty</th><th>Mode</th><th>Stars</th><th>BPM</th><th>Length</th><th>AR / CS / OD / HP</th></tr></thead>
                   <tbody>{set.beatmaps.map((beatmap) => <tr key={beatmap.id}>
@@ -104,6 +129,6 @@ export function ResultsList({
           );
         })}
       </div>
-    </div>
+    </>
   );
 }

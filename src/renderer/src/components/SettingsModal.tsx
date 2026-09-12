@@ -102,6 +102,7 @@ export function SettingsModal({ onClose, onSaved, firstRun, onFolderChanged }: P
           </p>
         )}
 
+        <strong className="modal-section-title">osu! API</strong>
         <label className="modal-field">
           <span className="field-label">Client ID</span>
           <input type="text" value={clientId} onChange={(e) => { setClientId(e.target.value); setHasSecret(false); }} placeholder="e.g. 12345" disabled={saving || loading} />
@@ -136,12 +137,14 @@ export function SettingsModal({ onClose, onSaved, firstRun, onFolderChanged }: P
 
         {saveError && <p className="error-text" role="alert">{saveError}</p>}
 
-        <button className="primary-button" onClick={handleSave} disabled={saving || loading || !clientId.trim() || (!clientSecret.trim() && !hasSecret)}>
-          {saving ? "Saving..." : "Save credentials"}
-        </button>
-        <button onClick={() => void forget()} disabled={saving || loading}>Forget saved credentials</button>
+        <div className="modal-actions">
+          <button className="primary-button" onClick={handleSave} disabled={saving || loading || !clientId.trim() || (!clientSecret.trim() && !hasSecret)}>
+            {saving ? "Saving..." : "Save credentials"}
+          </button>
+          <button onClick={() => void forget()} disabled={saving || loading}>Forget saved credentials</button>
+        </div>
         <section className="folder-settings" aria-labelledby="folder-settings-title">
-          <strong id="folder-settings-title">osu! folder</strong>
+          <strong id="folder-settings-title" className="modal-section-title">osu! folder</strong>
           <label className="remember-credentials">
             <input type="checkbox" checked={folderSettings.remember} disabled={folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, remember: e.target.checked })} />
             Remember my osu! folder on this PC

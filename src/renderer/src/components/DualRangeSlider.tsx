@@ -19,6 +19,7 @@ export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, uni
   const numMax = Math.max(rawMin, rawMax);
   const pctMin = ((numMin - min) / (max - min)) * 100;
   const pctMax = ((numMax - min) / (max - min)) * 100;
+  const active = valueMin.trim() !== "" || valueMax.trim() !== "";
 
   function handleMinSlider(v: number): void {
     onChangeMin(String(Math.min(v, numMax)));
@@ -28,8 +29,34 @@ export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, uni
   }
 
   return (
-    <div className="dual-slider">
-      <span className="field-label">{label}</span>
+    <div className={`dual-slider${active ? " active" : ""}`}>
+      <div className="dual-slider-head">
+        <span className="slider-label">{label}</span>
+        <span className="dual-slider-inputs">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={valueMin}
+            placeholder={String(min)}
+            aria-label={`${label} minimum`}
+            onChange={(e) => onChangeMin(e.target.value)}
+          />
+          <span className="dual-slider-sep">–</span>
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={valueMax}
+            placeholder={String(max)}
+            aria-label={`${label} maximum`}
+            onChange={(e) => onChangeMax(e.target.value)}
+          />
+          <span className="dual-slider-unit">{unit}</span>
+        </span>
+      </div>
       <div className="dual-slider-track">
         <div className="dual-slider-fill" style={{ left: `${pctMin}%`, right: `${100 - pctMax}%` }} />
         <input
@@ -38,6 +65,7 @@ export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, uni
           max={max}
           step={step}
           value={numMin}
+          aria-label={`${label} minimum`}
           onChange={(e) => handleMinSlider(Number(e.target.value))}
         />
         <input
@@ -46,31 +74,9 @@ export function DualRangeSlider({ label, min, max, step, valueMin, valueMax, uni
           max={max}
           step={step}
           value={numMax}
+          aria-label={`${label} maximum`}
           onChange={(e) => handleMaxSlider(Number(e.target.value))}
         />
-      </div>
-      <div className="dual-slider-inputs">
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={valueMin}
-          placeholder={String(min)}
-          onChange={(e) => onChangeMin(e.target.value)}
-        />
-        <span className="dual-slider-unit">{unit}</span>
-        <span className="dual-slider-sep">to</span>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={valueMax}
-          placeholder={String(max)}
-          onChange={(e) => onChangeMax(e.target.value)}
-        />
-        <span className="dual-slider-unit">{unit}</span>
       </div>
     </div>
   );
