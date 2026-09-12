@@ -1,6 +1,6 @@
 {
   "name": "beatmap-downloader",
-  "version": "0.4.0-v1-refined",
+  "version": "0.4.0",
   "description": "Batch osu! beatmap downloader. Filter by star rating, mode, and status via the official API, download the actual files via a mirror cascade.",
   "main": "./out/main/index.js",
   "author": "Haruki",
