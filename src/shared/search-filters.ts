@@ -2,7 +2,7 @@ import type { SearchFilters } from "./types";
 
 export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
   query: "",
-  mode: "",
+  mode: "0",
   status: "ranked",
   starsMin: "",
   starsMax: "",

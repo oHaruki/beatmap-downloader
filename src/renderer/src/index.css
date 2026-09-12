@@ -1331,7 +1331,7 @@ input[type="checkbox"]:disabled {
 }
 
 .modal {
-  width: 430px;
+  width: 760px;
   max-width: 100%;
   display: flex;
   flex-direction: column;
@@ -1340,6 +1340,26 @@ input[type="checkbox"]:disabled {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
+}
+
+.modal-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.modal-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .modal-columns {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modal-header {
