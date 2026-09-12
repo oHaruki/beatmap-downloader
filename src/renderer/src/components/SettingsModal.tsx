@@ -6,10 +6,11 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
   firstRun: boolean;
+  downloading: boolean;
   onFolderChanged: (selection: OsuFolderSelection | null) => void;
 }
 
-export function SettingsModal({ onClose, onSaved, firstRun, onFolderChanged }: Props) {
+export function SettingsModal({ onClose, onSaved, firstRun, downloading, onFolderChanged }: Props) {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [saving, setSaving] = useState(false);
@@ -149,18 +150,18 @@ export function SettingsModal({ onClose, onSaved, firstRun, onFolderChanged }: P
           <section className="modal-col" aria-labelledby="folder-settings-title">
             <strong id="folder-settings-title" className="modal-section-title">osu! folder</strong>
           <label className="remember-credentials">
-            <input type="checkbox" checked={folderSettings.remember} disabled={folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, remember: e.target.checked })} />
+            <input type="checkbox" checked={folderSettings.remember} disabled={downloading || folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, remember: e.target.checked })} />
             Remember my osu! folder on this PC
           </label>
           <label className="remember-credentials">
-            <input type="checkbox" checked={folderSettings.autoDetect} disabled={folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, autoDetect: e.target.checked })} />
+            <input type="checkbox" checked={folderSettings.autoDetect} disabled={downloading || folderLoading || folderSaving} onChange={(e) => setFolderSettings({ ...folderSettings, autoDetect: e.target.checked })} />
             Find osu! automatically at launch
           </label>
           <p className="modal-note">Uses your remembered location first. Automatic detection checks registered and common installations, including their configured Songs folder. These preferences survive portable app updates.</p>
           {folder && <p className="folder-location">osu!: {folder.osuFolder}<br />Songs: {folder.songsFolder}</p>}
           <div className="preset-actions">
-            <button onClick={() => void updateFolder(true)} disabled={folderLoading || folderSaving}>Choose folder</button>
-            <button onClick={() => void updateFolder()} disabled={folderLoading || folderSaving}>{folderSaving ? "Saving…" : "Save folder preferences"}</button>
+            <button onClick={() => void updateFolder(true)} disabled={downloading || folderLoading || folderSaving}>Choose folder</button>
+            <button onClick={() => void updateFolder()} disabled={downloading || folderLoading || folderSaving}>{folderSaving ? "Saving…" : "Save folder preferences"}</button>
           </div>
           {folderMessage && <p className="modal-note" role="status">{folderMessage}</p>}
           {folderError && <p className="error-text" role="alert">{folderError}</p>}

@@ -5,6 +5,8 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { downloadFromMirrorToFile } from "./mirror.ts";
 
+const archive = Buffer.from("UEsDBBQAAAAIAI82LF0W8Tk2FgAAABQAAAAHAAAAbWFwLm9zdcsvLlVIy8xJVUjLL8pNLFEoMzThAgBQSwECFAAUAAAACACPNixdFvE5NhYAAAAUAAAABwAAAAAAAAAAAAAAgAEAAAAAbWFwLm9zdVBLBQYAAAAAAQABADUAAAA7AAAAAAA=", "base64");
+
 async function withDestination(run: (destination: string) => Promise<void>): Promise<void> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "beatmap-mirror-"));
   try {
@@ -17,7 +19,6 @@ async function withDestination(run: (destination: string) => Promise<void>): Pro
 describe("downloadFromMirrorToFile", () => {
   it("streams a zip response to disk and reports progress", () =>
     withDestination(async (destination) => {
-      const archive = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]);
       const progress: Array<[number, number | null]> = [];
       const result = await downloadFromMirrorToFile(
         123,
@@ -31,7 +32,7 @@ describe("downloadFromMirrorToFile", () => {
       );
 
       assert.equal(result.mirror, "mirror.test");
-      assert.deepEqual(new Uint8Array(await fs.readFile(destination)), archive);
+      assert.deepEqual(await fs.readFile(destination), archive);
       assert.deepEqual(progress.at(-1), [archive.length, archive.length]);
     }));
 
@@ -49,14 +50,14 @@ describe("downloadFromMirrorToFile", () => {
             requested.push(url);
             return url.includes("bad.test")
               ? new Response("rate limited")
-              : new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]));
+              : new Response(archive);
           },
         },
       );
 
       assert.equal(result.mirror, "good.test");
       assert.equal(requested.length, 2);
-      assert.deepEqual(new Uint8Array(await fs.readFile(destination)), new Uint8Array([0x50, 0x4b, 3, 4]));
+      assert.deepEqual(await fs.readFile(destination), archive);
     }));
 
   it("does not create a file when already cancelled", () =>
@@ -74,4 +75,57 @@ describe("downloadFromMirrorToFile", () => {
       );
       await assert.rejects(fs.stat(destination), { code: "ENOENT" });
     }));
+
+ it("rejects fake, truncated and corrupt archives without leaving files", () =>
+   withDestination(async (destination) => {
+     const corrupt = Buffer.from(archive);
+     corrupt[40] ^= 0xff;
+     for (const [index, bytes] of [Buffer.from("PK"), archive.subarray(0, 45), corrupt].entries()) {
+       await assert.rejects(downloadFromMirrorToFile(1, destination, {}, {
+         mirrors: [`https://invalid-${index}.test/{id}`], fetch: async () => new Response(bytes),
+       }));
+       await assert.rejects(fs.stat(destination), { code: "ENOENT" });
+     }
+   }));
+
+ it("waits for rate limits, recovers, and bounds repeated failures", () =>
+   withDestination(async (destination) => {
+     let now = 0;
+     let calls = 0;
+     const waits: number[] = [];
+     const deps = {
+       mirrors: ["https://limited.test/{id}"], now: () => now,
+       wait: async (ms: number) => { waits.push(ms); now += ms; },
+       fetch: async () => ++calls === 1
+         ? new Response("limited", { status: 429, headers: { "retry-after": "2" } })
+         : new Response(archive),
+     };
+     await downloadFromMirrorToFile(1, destination, {}, deps);
+     assert.equal(calls, 2);
+     assert.deepEqual(waits, [2000]);
+     calls = 0;
+     await assert.rejects(downloadFromMirrorToFile(2, destination, {}, {
+       ...deps, mirrors: ["https://always-limited.test/{id}"],
+       fetch: async () => { calls++; return new Response("limited", { status: 429 }); },
+     }), /429/);
+     assert.equal(calls, 4);
+   }));
+
+ it("cancels a cooldown wait without another request", () =>
+   withDestination(async (destination) => {
+     const controller = new AbortController();
+     let calls = 0;
+     const promise = downloadFromMirrorToFile(1, destination, { signal: controller.signal }, {
+       mirrors: ["https://cancel-wait.test/{id}"],
+       fetch: async () => {
+         calls++;
+         setTimeout(() => controller.abort(), 20);
+         return new Response("limited", { status: 429, headers: { "retry-after": "60" } });
+       },
+     });
+     await assert.rejects(promise, { name: "AbortError" });
+     assert.equal(calls, 1);
+     await assert.rejects(fs.stat(destination), { code: "ENOENT" });
+   }));
+
 });

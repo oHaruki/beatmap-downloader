@@ -430,6 +430,7 @@ export default function App() {
       <TitleBar status={statusLine} />
       {showSettings && (
         <SettingsModal
+          downloading={downloading}
           onFolderChanged={(selection) => {
             setOsuFolder(selection?.osuFolder ?? null);
             setSongsFolder(selection?.songsFolder ?? null);

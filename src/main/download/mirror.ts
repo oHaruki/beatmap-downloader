@@ -1,4 +1,6 @@
 import { promises as fs } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
+import { validateArchive } from "./validate-archive";
 
 const DEFAULT_MIRRORS = [
   "https://api.nerinyan.moe/d/{id}",
@@ -25,6 +27,7 @@ export interface MirrorDownloadDeps {
   fetch?: typeof fetch;
   mirrors?: readonly string[];
   now?: () => number;
+  wait?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
 }
 
 const mirrorCooldownUntil = new Map<string, number>();
@@ -45,6 +48,9 @@ function combinedSignal(signal: AbortSignal | undefined): AbortSignal {
 }
 
 function responseLength(response: Response): number | null {
+  // Fetch decodes HTTP compression; its wire length is not the decoded size.
+  const encoding = response.headers.get("content-encoding");
+  if (encoding && encoding !== "identity") return null;
   const header = response.headers.get("content-length");
   if (!header) return null;
   const value = Number(header);
@@ -97,8 +103,8 @@ async function writeResponseToFile(
 
       if (!headerValidated) {
         header = Buffer.concat([header, value]);
-        if (header.length < 2) continue;
-        if (header[0] !== 0x50 || header[1] !== 0x4b) {
+        if (header.length < 4) continue;
+        if (header.readUInt32LE(0) !== 0x04034b50) {
           throw new Error(`not a zip (${describeNonZip(header)})`);
         }
         headerValidated = true;
@@ -111,6 +117,7 @@ async function writeResponseToFile(
     }
 
     if (!headerValidated) throw new Error("not a zip (empty response)");
+    if (total !== null && received !== total) throw new Error("download length does not match Content-Length");
     await handle.sync();
     completed = true;
     return received;
@@ -130,53 +137,62 @@ export async function downloadFromMirrorToFile(
   const mirrors = deps.mirrors ?? DEFAULT_MIRRORS;
   const now = deps.now ?? Date.now;
   let lastError: Error | null = null;
-  let soonestCooldown: number | null = null;
+  const wait = deps.wait ?? ((ms, signal) => delay(ms, undefined, { signal }));
+  // Retry temporary rate limits at most three times per file.
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    let soonestCooldown: number | null = null;
 
-  for (const template of mirrors) {
-    throwIfAborted(options.signal);
-    const coolingUntil = mirrorCooldownUntil.get(template);
-    if (coolingUntil && now() < coolingUntil) {
-      soonestCooldown = Math.min(soonestCooldown ?? coolingUntil, coolingUntil);
-      continue;
+    for (const template of mirrors) {
+      throwIfAborted(options.signal);
+      const coolingUntil = mirrorCooldownUntil.get(template);
+      if (coolingUntil && now() < coolingUntil) {
+        soonestCooldown = Math.min(soonestCooldown ?? coolingUntil, coolingUntil);
+        continue;
+      }
+
+      const url = template.replace("{id}", String(beatmapsetId));
+      try {
+        const response = await fetchRequest(url, {
+          headers: { "User-Agent": USER_AGENT },
+          signal: combinedSignal(options.signal),
+        });
+        if (response.status === 429) {
+          mirrorCooldownUntil.set(template, now() + retryAfterMs(response, now()));
+          soonestCooldown = Math.min(soonestCooldown ?? Infinity, mirrorCooldownUntil.get(template)!);
+          await response.body?.cancel();
+          lastError = new Error(`${new URL(url).hostname} returned HTTP 429`);
+          continue;
+        }
+        if (response.status === 401 || response.status === 403) {
+          await response.body?.cancel();
+          mirrorCooldownUntil.set(template, now() + 10 * 60_000);
+          lastError = new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
+          continue;
+        }
+        if (!response.ok) {
+          await response.body?.cancel();
+          lastError = new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
+          continue;
+        }
+
+        await fs.rm(destination, { force: true });
+        const bytesDownloaded = await writeResponseToFile(response, destination, options);
+        try { await validateArchive(destination, options.signal); }
+        catch (error) { throw new Error(`not a zip (${error instanceof Error ? error.message : error})`); }
+        throwIfAborted(options.signal);
+        return { bytesDownloaded, mirror: new URL(url).hostname };
+      } catch (error) {
+        await fs.rm(destination, { force: true }).catch(() => undefined);
+        if (options.signal?.aborted) throw abortError();
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (lastError.message.startsWith("not a zip")) {
+          mirrorCooldownUntil.set(template, now() + 30_000);
+        }
+      }
     }
 
-    const url = template.replace("{id}", String(beatmapsetId));
-    try {
-      const response = await fetchRequest(url, {
-        headers: { "User-Agent": USER_AGENT },
-        signal: combinedSignal(options.signal),
-      });
-      if (response.status === 429) {
-        mirrorCooldownUntil.set(template, now() + retryAfterMs(response, now()));
-        lastError = new Error(`${new URL(url).hostname} returned HTTP 429`);
-        continue;
-      }
-      if (response.status === 401 || response.status === 403) {
-        mirrorCooldownUntil.set(template, now() + 10 * 60_000);
-        lastError = new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
-        continue;
-      }
-      if (!response.ok) {
-        lastError = new Error(`${new URL(url).hostname} returned HTTP ${response.status}`);
-        continue;
-      }
-
-      await fs.rm(destination, { force: true });
-      const bytesDownloaded = await writeResponseToFile(response, destination, options);
-      return { bytesDownloaded, mirror: new URL(url).hostname };
-    } catch (error) {
-      await fs.rm(destination, { force: true }).catch(() => undefined);
-      if (options.signal?.aborted) throw abortError();
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (lastError.message.startsWith("not a zip")) {
-        mirrorCooldownUntil.set(template, now() + 30_000);
-      }
-    }
+    if (soonestCooldown === null || attempt === 3) break;
+    await wait(Math.max(1, soonestCooldown - now()), options.signal);
   }
-
-  if (!lastError && soonestCooldown !== null) {
-    const seconds = Math.max(1, Math.ceil((soonestCooldown - now()) / 1000));
-    throw new Error(`all mirrors are cooling down; try again in ${seconds} seconds`);
-  }
-  throw lastError ?? new Error("no download mirrors are configured");
+  throw lastError ?? new Error("no download mirrors are available");
 }

@@ -2,6 +2,10 @@ import type { BeatmapsetSummary } from "@shared/types";
 import { useState } from "react";
 import { IconChevron, IconExternal, IconFolder, IconPlay, IconStop } from "./icons";
 
+function initializePreviewVolume(element: HTMLAudioElement | null): void {
+  if (element) element.volume = 0.1;
+}
+
 interface Props {
   results: BeatmapsetSummary[];
   selected: Set<number>;
@@ -113,7 +117,7 @@ export function ResultsList({
                   </button>
                 )}
               </div>
-              {previewing && <div className="preview-row"><audio className="beatmap-preview" controls autoPlay preload="none" ref={(el) => { if (el) el.volume = 0.1; }} src={`https://b.ppy.sh/preview/${set.id}.mp3`} onError={() => { setError("Audio preview is unavailable for this beatmap."); setPreview(null); }} onEnded={() => setPreview(null)} /></div>}
+              {previewing && <div className="preview-row"><audio className="beatmap-preview" controls autoPlay preload="none" ref={initializePreviewVolume} src={`https://b.ppy.sh/preview/${set.id}.mp3`} onError={() => { setError("Audio preview is unavailable for this beatmap."); setPreview(null); }} onEnded={() => setPreview(null)} /></div>}
               {open && <div className="difficulty-details">
                 <p className="meta">The download contains the whole beatmapset. All included difficulties:</p>
                 <table><thead><tr><th>Difficulty</th><th>Mode</th><th>Stars</th><th>BPM</th><th>Length</th><th>AR / CS / OD / HP</th></tr></thead>
