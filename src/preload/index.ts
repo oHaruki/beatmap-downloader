@@ -2,7 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   DownloadJob,
   DownloadProgressEvent,
+  CredentialSaveResult,
   InstalledSongsScan,
+  OsuFolderSelection,
   RendererApi,
   SearchFilters,
   SearchResult,
@@ -12,23 +14,37 @@ const api: RendererApi = {
   searchBeatmapsets: (filters: SearchFilters): Promise<SearchResult> =>
     ipcRenderer.invoke("search-beatmapsets", filters),
 
+  cancelSearch: (): Promise<boolean> => ipcRenderer.invoke("cancel-search"),
+
   chooseOutputFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-output-folder"),
 
   getOutputFolder: (): Promise<string> => ipcRenderer.invoke("get-output-folder"),
 
   getDownloadedIds: (outDir: string): Promise<number[]> => ipcRenderer.invoke("get-downloaded-ids", outDir),
 
-  getSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("get-songs-folder"),
+  getOsuFolder: (): Promise<OsuFolderSelection | null> => ipcRenderer.invoke("get-osu-folder"),
+  getOsuFolderSettings: () => ipcRenderer.invoke("get-osu-folder-settings"),
+  setOsuFolderSettings: (settings) => ipcRenderer.invoke("set-osu-folder-settings", settings),
 
-  chooseSongsFolder: (): Promise<string | null> => ipcRenderer.invoke("choose-songs-folder"),
+  chooseOsuFolder: (): Promise<OsuFolderSelection | null> => ipcRenderer.invoke("choose-osu-folder"),
 
-  getInstalledBeatmapsetIds: (songsFolder: string): Promise<InstalledSongsScan> =>
-    ipcRenderer.invoke("get-installed-beatmapset-ids", songsFolder),
+  getInstalledBeatmapsetIds: (
+    osuFolder: string,
+    songsFolder: string,
+  ): Promise<InstalledSongsScan> =>
+    ipcRenderer.invoke("get-installed-beatmapset-ids", osuFolder, songsFolder),
 
   hasApiCredentials: (): Promise<boolean> => ipcRenderer.invoke("has-api-credentials"),
 
-  setApiCredentials: (clientId: string, clientSecret: string): Promise<boolean> =>
-    ipcRenderer.invoke("set-api-credentials", clientId, clientSecret),
+  getCredentialSettings: () => ipcRenderer.invoke("get-credential-settings"),
+  setApiCredentials: (clientId: string, clientSecret: string, remember: boolean): Promise<CredentialSaveResult> =>
+    ipcRenderer.invoke("set-api-credentials", clientId, clientSecret, remember),
+  forgetApiCredentials: () => ipcRenderer.invoke("forget-api-credentials"),
+  getSearchPresets: () => ipcRenderer.invoke("get-search-presets"),
+  saveSearchPresets: (presets) => ipcRenderer.invoke("save-search-presets", presets),
+  getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
+  revealDownload: (id) => ipcRenderer.invoke("reveal-download", id),
+  exportFailedIds: (ids) => ipcRenderer.invoke("export-failed-ids", ids),
 
   startDownload: (
     jobs: DownloadJob[],
@@ -37,10 +53,16 @@ const api: RendererApi = {
     installedIds: number[]
   ): Promise<{ done: true }> => ipcRenderer.invoke("start-download", jobs, outDir, force, installedIds),
 
+  cancelDownload: (): Promise<boolean> => ipcRenderer.invoke("cancel-download"),
+
   getAutoImportEnabled: (): Promise<boolean> => ipcRenderer.invoke("get-auto-import-enabled"),
 
   setAutoImportEnabled: (enabled: boolean): Promise<boolean> =>
     ipcRenderer.invoke("set-auto-import-enabled", enabled),
+
+  openOutputFolder: (): Promise<string> => ipcRenderer.invoke("open-output-folder"),
+
+  openOsuFolder: (): Promise<string> => ipcRenderer.invoke("open-osu-folder"),
 
   onDownloadProgress: (callback: (event: DownloadProgressEvent) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: DownloadProgressEvent): void =>

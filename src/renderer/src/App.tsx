@@ -1,47 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   BeatmapsetSummary,
+  DownloadJob,
   DownloadProgressEvent,
   InstalledSongsScan,
   SearchFilters,
 } from "@shared/types";
-import { FilterForm } from "./components/FilterForm";
-import { ResultsList } from "./components/ResultsList";
-import { DownloadPanel } from "./components/DownloadPanel";
-import { TitleBar } from "./components/TitleBar";
+import { DEFAULT_SEARCH_FILTERS, validateSearchFilters } from "@shared/search-filters";
 import { DownloadBar } from "./components/DownloadBar";
-import { SettingsModal } from "./components/SettingsModal";
+import { DownloadPanel } from "./components/DownloadPanel";
+import { FilterForm } from "./components/FilterForm";
 import { OwnershipFilterBar } from "./components/OwnershipFilterBar";
+import { ResultsList } from "./components/ResultsList";
+import { SettingsModal } from "./components/SettingsModal";
+import { TitleBar } from "./components/TitleBar";
+import { HistoryPanel } from "./components/HistoryPanel";
+import { IconClock } from "./components/icons";
 import {
   applyResultsFilter,
+  countByOwnership,
   retainVisibleSelections,
   type ResultsOwnershipFilter,
 } from "./results-filter";
 
-const DEFAULT_FILTERS: SearchFilters = {
-  query: "",
-  mode: "",
-  status: "ranked",
-  starsMin: "",
-  starsMax: "",
-  bpmMin: "",
-  bpmMax: "",
-  lengthMin: "",
-  lengthMax: "",
-  arMin: "",
-  arMax: "",
-  csMin: "",
-  csMax: "",
-  odMin: "",
-  odMax: "",
-  hpMin: "",
-  hpMax: "",
-};
+const PAGE_DELAY_MS = 150;
+const LARGE_BATCH_SIZE = 100;
 
-const PAGE_DELAY_MS = 150; // stay well under the API's courtesy rate limit
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function addUniqueResults(
+  previous: BeatmapsetSummary[],
+  incoming: BeatmapsetSummary[],
+): BeatmapsetSummary[] {
+  const next = new Map(previous.map((set) => [set.id, set]));
+  for (const set of incoming) next.set(set.id, set);
+  return [...next.values()];
+}
 
 export default function App() {
-  const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<SearchFilters>(DEFAULT_SEARCH_FILTERS);
   const [results, setResults] = useState<BeatmapsetSummary[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [searchLoading, setSearchLoading] = useState(false);
@@ -50,95 +49,131 @@ export default function App() {
   const [pagesFetched, setPagesFetched] = useState(0);
   const cancelSearchRef = useRef(false);
   const searchInFlightRef = useRef(false);
+  const filterVersionRef = useRef(0);
   const installedScanRef = useRef(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const [outputFolder, setOutputFolder] = useState<string | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<number>>(new Set());
+  const [osuFolder, setOsuFolder] = useState<string | null>(null);
   const [songsFolder, setSongsFolder] = useState<string | null>(null);
   const [installedIds, setInstalledIds] = useState<Set<number>>(new Set());
   const [installedSource, setInstalledSource] = useState<InstalledSongsScan["source"] | null>(null);
   const [forceRedownload, setForceRedownload] = useState(false);
-  // Import-on-download toggle; persisted in the main process.
   const [autoImport, setAutoImport] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [cancelDownloadRequested, setCancelDownloadRequested] = useState(false);
   const [progress, setProgress] = useState<Map<number, DownloadProgressEvent>>(new Map());
   const [batchTotal, setBatchTotal] = useState(0);
+  const [lastBatchJobs, setLastBatchJobs] = useState<DownloadJob[]>([]);
+  const [lastBatchForce, setLastBatchForce] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [appError, setAppError] = useState<string | null>(null);
   const [ownershipFilter, setOwnershipFilter] = useState<ResultsOwnershipFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
   const [settingsFirstRun, setSettingsFirstRun] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    void window.api.getOutputFolder().then(setOutputFolder);
-    void window.api.getSongsFolder().then(setSongsFolder);
-    void window.api.getAutoImportEnabled().then(setAutoImport);
-    void window.api.hasApiCredentials().then((has) => {
-      if (!has) {
-        setSettingsFirstRun(true);
-        setShowSettings(true);
-      }
-    });
+    void window.api
+      .getOutputFolder()
+      .then(setOutputFolder)
+      .catch((error) => setAppError(errorMessage(error, "Could not prepare the output folder.")));
+    void window.api
+      .getOsuFolder()
+      .then((selection) => {
+        setOsuFolder(selection?.osuFolder ?? null);
+        setSongsFolder(selection?.songsFolder ?? null);
+      })
+      .catch((error) => setAppError(errorMessage(error, "Could not detect the osu! folder.")));
+    void window.api
+      .getAutoImportEnabled()
+      .then(setAutoImport)
+      .catch((error) => setAppError(errorMessage(error, "Could not load auto-import settings.")));
+    void window.api
+      .hasApiCredentials()
+      .then((hasCredentials) => {
+        if (!hasCredentials) {
+          setSettingsFirstRun(true);
+          setShowSettings(true);
+        }
+      })
+      .catch((error) => setAppError(errorMessage(error, "Could not read API settings.")));
   }, []);
 
   useEffect(() => {
-    if (!outputFolder) return;
-    void refreshDownloadedIds(outputFolder);
+    if (outputFolder) void refreshDownloadedIds(outputFolder);
   }, [outputFolder]);
 
   useEffect(() => {
-    if (!songsFolder) return;
-    void refreshInstalledIds(songsFolder);
-  }, [songsFolder]);
+    if (osuFolder && songsFolder) void refreshInstalledIds(osuFolder, songsFolder);
+  }, [osuFolder, songsFolder]);
 
-  // osu! only rewrites osu!.db when it exits, and a map imported while it is
-  // still running shows up as nothing but a folder. Re-scanning on focus
-  // means coming back from osu! after an import is enough to pick it up,
-  // instead of needing a restart.
   useEffect(() => {
-    if (!songsFolder) return;
-    const onFocus = (): void => void refreshInstalledIds(songsFolder);
+    const onFocus = (): void => {
+      if (osuFolder && songsFolder) void refreshInstalledIds(osuFolder, songsFolder);
+      if (outputFolder && !downloading) void refreshDownloadedIds(outputFolder);
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [songsFolder]);
+  }, [osuFolder, songsFolder, outputFolder, downloading]);
 
-  useEffect(() => window.api.onDownloadProgress((event) => {
-    setProgress((prev) => new Map(prev).set(event.beatmapsetId, event));
-    if (event.status === "done" && outputFolder) void refreshDownloadedIds(outputFolder);
-  }), [outputFolder]);
+  useEffect(
+    () =>
+      window.api.onDownloadProgress((event) => {
+        setProgress((previous) => new Map(previous).set(event.beatmapsetId, event));
+        if (event.status === "done") setDownloadedIds((previous) => new Set(previous).add(event.beatmapsetId));
+      }),
+    [],
+  );
 
-  async function refreshInstalledIds(folder: string): Promise<void> {
-    if (installedScanRef.current) return; // a scan is already in flight
+  async function refreshInstalledIds(osuRoot: string, songs: string): Promise<void> {
+    if (installedScanRef.current) return;
     installedScanRef.current = true;
     try {
-      const scan = await window.api.getInstalledBeatmapsetIds(folder);
+      const scan = await window.api.getInstalledBeatmapsetIds(osuRoot, songs);
       setInstalledIds(new Set(scan.ids));
       setInstalledSource(scan.source);
+    } catch (error) {
+      setAppError(errorMessage(error, "Could not scan the osu! folder."));
     } finally {
       installedScanRef.current = false;
     }
   }
 
   async function refreshDownloadedIds(folder: string): Promise<void> {
-    const ids = await window.api.getDownloadedIds(folder);
-    setDownloadedIds(new Set(ids));
+    try {
+      setDownloadedIds(new Set(await window.api.getDownloadedIds(folder)));
+    } catch (error) {
+      setAppError(errorMessage(error, "Could not read the download history."));
+    }
   }
 
-  async function handleChooseSongsFolder(): Promise<void> {
-    const folder = await window.api.chooseSongsFolder();
-    if (folder) setSongsFolder(folder);
+  async function handleChooseOsuFolder(): Promise<void> {
+    try {
+      const selection = await window.api.chooseOsuFolder();
+      if (!selection) return;
+      setOsuFolder(selection.osuFolder);
+      setSongsFolder(selection.songsFolder);
+    } catch (error) {
+      setAppError(errorMessage(error, "Could not use that osu! folder."));
+    }
   }
 
   const labels = useMemo(() => {
     const map = new Map<number, string>();
     for (const set of results) map.set(set.id, `${set.artist} - ${set.title}`);
+    for (const job of lastBatchJobs) map.set(job.beatmapsetId, job.fileName);
     return map;
-  }, [results]);
+  }, [results, lastBatchJobs]);
 
-  const remainingInResults = results.filter(
-    (set) => !installedIds.has(set.id) && !downloadedIds.has(set.id)
-  ).length;
+  const counts = useMemo(
+    () => countByOwnership(results, installedIds, downloadedIds),
+    [results, installedIds, downloadedIds],
+  );
   const visibleResults = useMemo(
     () => applyResultsFilter(results, ownershipFilter, installedIds, downloadedIds),
-    [results, ownershipFilter, installedIds, downloadedIds]
+    [results, ownershipFilter, installedIds, downloadedIds],
   );
 
   useEffect(() => {
@@ -148,56 +183,97 @@ export default function App() {
     });
   }, [visibleResults]);
 
+  const allVisibleSelected = visibleResults.length > 0 && visibleResults.every((set) => selected.has(set.id));
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = selected.size > 0 && !allVisibleSelected;
+  });
+
   const selectedRemaining = forceRedownload
     ? selected.size
     : [...selected].filter((id) => !installedIds.has(id) && !downloadedIds.has(id)).length;
-
-  const activeDownloads = [...progress.values()].filter((e) => e.status === "downloading").length;
-  const statusLine = activeDownloads > 0
-    ? { text: `downloading ${activeDownloads} map${activeDownloads === 1 ? "" : "s"}`, tone: "busy" as const }
+  const activeDownloads = [...progress.values()].filter((event) => event.status === "downloading").length;
+  const retryableCount = [...progress.values()].filter(
+    (event) => event.status === "error" || event.status === "cancelled",
+  ).length;
+  const statusLine = downloading
+    ? {
+        text: cancelDownloadRequested
+          ? "cancelling downloads"
+          : activeDownloads > 0
+            ? `downloading ${activeDownloads} map${activeDownloads === 1 ? "" : "s"}`
+            : "starting downloads",
+        tone: "busy" as const,
+      }
     : searchLoading
       ? { text: "searching", tone: "busy" as const }
       : { text: "ready", tone: "ok" as const };
 
-  async function runSearch(): Promise<void> {
+  async function loadAllSearchPages(): Promise<void> {
     if (searchInFlightRef.current) return;
+    const validationError = validateSearchFilters(filters);
+    if (validationError) {
+      setSearchError(validationError);
+      return;
+    }
     searchInFlightRef.current = true;
     cancelSearchRef.current = false;
     setSearchLoading(true);
     setSearchError(null);
+    const filterVersion = filterVersionRef.current;
+    const searchFilters = { ...filters, cursorString: null };
     setHasCompletedSearch(false);
     setResults([]);
+    setSelected(new Set());
     setPagesFetched(0);
     setOwnershipFilter("all");
 
     let cursorString: string | null = null;
-    let page = 0;
+    let fetchedPages = 0;
+    let cancelled = false;
+    const seenCursors = new Set<string>();
     try {
-      for (;;) {
-        const result = await window.api.searchBeatmapsets({ ...filters, cursorString });
+      while (!cancelSearchRef.current) {
+        const result = await window.api.searchBeatmapsets({
+          ...searchFilters,
+          cursorString,
+        });
+        if (result.cancelled) {
+          cancelled = true;
+          break;
+        }
         if (result.error) {
           setSearchError(result.error);
           return;
         }
-        setResults((prev) => [...prev, ...result.beatmapsets]);
-        // Everything a search turns up is selected by default, since that's
-        // almost always what you want after filtering; unwanted maps get
-        // unticked individually or cleared with "Deselect all".
-        setSelected((prev) => {
-          const next = new Set(prev);
+
+        setResults((previous) => addUniqueResults(previous, result.beatmapsets));
+        setSelected((previous) => {
+          const next = new Set(previous);
           for (const set of result.beatmapsets) next.add(set.id);
           return next;
         });
-        page += 1;
-        setPagesFetched(page);
+        fetchedPages += 1;
+        setPagesFetched(fetchedPages);
+        if (filterVersion !== filterVersionRef.current) {
+          break;
+        }
 
-        cursorString = result.cursorString;
-        if (!cursorString || result.beatmapsets.length === 0 || cancelSearchRef.current) break;
-        await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+        const nextCursor = result.cursorString;
+        if (!nextCursor) break;
+        if (seenCursors.has(nextCursor)) {
+          setSearchError("Search stopped because osu! returned a repeated page cursor.");
+          return;
+        }
+        seenCursors.add(nextCursor);
+        cursorString = nextCursor;
+        await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY_MS));
       }
-      setHasCompletedSearch(true);
+      cancelled ||= cancelSearchRef.current;
+      if (!cancelled && filterVersion === filterVersionRef.current) {
+        setHasCompletedSearch(true);
+      }
     } catch (error) {
-      setSearchError(error instanceof Error ? error.message : "Search failed unexpectedly.");
+      setSearchError(errorMessage(error, "Search failed unexpectedly."));
     } finally {
       searchInFlightRef.current = false;
       setSearchLoading(false);
@@ -205,18 +281,17 @@ export default function App() {
   }
 
   function handleSearch(): void {
-    if (searchInFlightRef.current || searchLoading) return;
-    setSelected(new Set());
-    void runSearch();
+    void loadAllSearchPages();
   }
 
   function handleCancelSearch(): void {
     cancelSearchRef.current = true;
+    void window.api.cancelSearch();
   }
 
   function toggleSelected(id: number): void {
-    setSelected((prev) => {
-      const next = new Set(prev);
+    setSelected((previous) => {
+      const next = new Set(previous);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -238,37 +313,95 @@ export default function App() {
   }
 
   async function handleChooseFolder(): Promise<void> {
-    const folder = await window.api.chooseOutputFolder();
-    if (folder) setOutputFolder(folder);
+    try {
+      const folder = await window.api.chooseOutputFolder();
+      if (folder) setOutputFolder(folder);
+    } catch (error) {
+      setAppError(errorMessage(error, "Could not save the output folder."));
+    }
   }
 
-  function handleToggleAutoImport(value: boolean): void {
+  async function handleOpenFolder(kind: "output" | "osu"): Promise<void> {
+    try {
+      const error =
+        kind === "output" ? await window.api.openOutputFolder() : await window.api.openOsuFolder();
+      if (error) setAppError(error);
+    } catch (error) {
+      setAppError(errorMessage(error, "Could not open the folder."));
+    }
+  }
+
+  async function handleToggleAutoImport(value: boolean): Promise<void> {
+    const previous = autoImport;
     setAutoImport(value);
-    void window.api.setAutoImportEnabled(value);
+    try {
+      await window.api.setAutoImportEnabled(value);
+    } catch (error) {
+      setAutoImport(previous);
+      setAppError(errorMessage(error, "Could not save the auto-import setting."));
+    }
   }
 
-  async function handleDownload(): Promise<void> {
-    if (!outputFolder || selected.size === 0) return;
-    setDownloading(true);
-    setProgress(new Map());
+  async function startBatch(jobs: DownloadJob[], force = forceRedownload): Promise<void> {
+    if (!outputFolder || jobs.length === 0 || downloading) return;
+    if (jobs.length > 1_000) {
+      setDownloadError("A batch can contain at most 1,000 beatmapsets. Select fewer maps and try again.");
+      return;
+    }
+    if (
+      jobs.length >= LARGE_BATCH_SIZE &&
+      !window.confirm(`Download ${jobs.length.toLocaleString()} beatmapsets? This may take a while.`)
+    ) {
+      return;
+    }
 
+    setDownloading(true);
+    setCancelDownloadRequested(false);
+    setDownloadError(null);
+    setProgress(new Map());
+    setBatchTotal(jobs.length);
+    setLastBatchJobs(jobs);
+    setLastBatchForce(force);
+    try {
+      await window.api.startDownload(jobs, outputFolder, force, [...installedIds]);
+    } catch (error) {
+      setDownloadError(errorMessage(error, "The download batch could not be completed."));
+    } finally {
+      setDownloading(false);
+      setCancelDownloadRequested(false);
+      await refreshDownloadedIds(outputFolder);
+      if (autoImport && osuFolder && songsFolder) {
+        await refreshInstalledIds(osuFolder, songsFolder);
+      }
+    }
+  }
+
+  function handleDownload(): void {
+    if (!outputFolder || selected.size === 0) return;
     const selectedSets = results.filter((set) => selected.has(set.id));
-    // Excluded here, not just left for the queue's own skip check, so
-    // already-owned maps never show up as "downloading" in the first place.
     const toDownload = forceRedownload
       ? selectedSets
       : selectedSets.filter((set) => !installedIds.has(set.id) && !downloadedIds.has(set.id));
+    void startBatch(
+      toDownload.map((set) => ({
+        beatmapsetId: set.id,
+        fileName: `${set.artist} - ${set.title} (${set.creator})`,
+      })),
+    );
+  }
 
-    setBatchTotal(toDownload.length);
-    const jobs = toDownload.map((set) => ({
-      beatmapsetId: set.id,
-      fileName: `${set.artist} - ${set.title} (${set.creator})`,
-    }));
-    try {
-      await window.api.startDownload(jobs, outputFolder, forceRedownload, [...installedIds]);
-    } finally {
-      setDownloading(false);
-    }
+  function handleCancelDownload(): void {
+    setCancelDownloadRequested(true);
+    void window.api.cancelDownload();
+  }
+
+  function handleRetryFailed(): void {
+    const retryableIds = new Set(
+      [...progress.values()]
+        .filter((event) => event.status === "error" || event.status === "cancelled")
+        .map((event) => event.beatmapsetId),
+    );
+    void startBatch(lastBatchJobs.filter((job) => retryableIds.has(job.beatmapsetId)), lastBatchForce);
   }
 
   const downloadLabel = downloading
@@ -278,18 +411,33 @@ export default function App() {
       : selectedRemaining === selected.size
         ? `Download ${selected.size} selected`
         : `Download ${selectedRemaining} of ${selected.size}`;
-
   const emptyResultsMessage = results.length > 0
     ? "No maps match the selected ownership filter."
     : hasCompletedSearch
       ? "No beatmaps matched this search."
-      : "No results yet. Try a search above.";
+      : "No results yet. Set your filters and search.";
+
+  const renderAlert = (message: string | null, dismiss: () => void) =>
+    message && (
+      <p className="alert" role="alert">
+        <span>{message}</span>
+        <button onClick={dismiss}>Dismiss</button>
+      </p>
+    );
 
   return (
     <div className="app-shell">
-      <TitleBar />
+      <TitleBar status={statusLine} />
       {showSettings && (
         <SettingsModal
+          downloading={downloading}
+          onFolderChanged={(selection) => {
+            setOsuFolder(selection?.osuFolder ?? null);
+            setSongsFolder(selection?.songsFolder ?? null);
+            setInstalledIds(new Set());
+            setInstalledSource(null);
+            if (selection) void refreshInstalledIds(selection.osuFolder, selection.songsFolder);
+          }}
           firstRun={settingsFirstRun}
           onClose={() => setShowSettings(false)}
           onSaved={() => {
@@ -297,11 +445,8 @@ export default function App() {
           }}
         />
       )}
-      <div className="status-bar">
-        <span className={`status-dot ${statusLine.tone}`} />
-        <span>{statusLine.text}</span>
-      </div>
       <DownloadBar
+        busy={downloading}
         label={downloadLabel}
         canDownload={!downloading && Boolean(outputFolder) && selectedRemaining > 0}
         onDownload={handleDownload}
@@ -311,50 +456,79 @@ export default function App() {
         }}
         outputFolder={outputFolder}
         onChooseOutputFolder={handleChooseFolder}
+        onOpenOutputFolder={() => void handleOpenFolder("output")}
+        osuFolder={osuFolder}
         songsFolder={songsFolder}
-        onChooseSongsFolder={handleChooseSongsFolder}
+        onChooseOsuFolder={handleChooseOsuFolder}
+        onOpenOsuFolder={() => void handleOpenFolder("osu")}
         installedCount={installedIds.size}
         installedSource={installedSource}
         forceRedownload={forceRedownload}
         onToggleForceRedownload={setForceRedownload}
         autoImport={autoImport}
-        onToggleAutoImport={handleToggleAutoImport}
+        onToggleAutoImport={(value) => void handleToggleAutoImport(value)}
       />
 
       <div className="app-body">
         <aside className="sidebar">
           <FilterForm
             filters={filters}
-            onChange={setFilters}
+            onChange={(nextFilters) => {
+              filterVersionRef.current += 1;
+              setFilters(nextFilters);
+            }}
             onSearch={handleSearch}
-            onReset={() => setFilters(DEFAULT_FILTERS)}
+            onReset={() => {
+              filterVersionRef.current += 1;
+              setFilters(DEFAULT_SEARCH_FILTERS);
+            }}
             loading={searchLoading}
           />
         </aside>
 
         <main className="main-panel">
-          {searchError && <p className="error-text">{searchError}</p>}
-          {searchLoading && (
-            <p className="search-status">
-              Searching... {results.length} maps found so far ({pagesFetched} pages)
-              <button onClick={handleCancelSearch} style={{ marginLeft: 8 }}>
-                Cancel
-              </button>
-            </p>
-          )}
-          {!searchLoading && results.length > 0 && (
-            <p className="search-status">
-              {results.length} maps found, {remainingInResults} you do not have yet.
-            </p>
-          )}
+          {renderAlert(appError, () => setAppError(null))}
+          {renderAlert(searchError, () => setSearchError(null))}
+          {renderAlert(downloadError, () => setDownloadError(null))}
 
-          <OwnershipFilterBar
-            results={results}
-            installedIds={installedIds}
-            downloadedIds={downloadedIds}
-            value={ownershipFilter}
-            onChange={changeOwnershipFilter}
-          />
+          <div className="results-toolbar">
+            {visibleResults.length > 0 && (
+              <label className="select-all">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all visible results"
+                />
+                {selected.size} of {visibleResults.length} selected
+              </label>
+            )}
+            <div className="search-status">
+              <span className="search-status-text">
+                {searchLoading
+                  ? `Searching… ${results.length} found · ${pagesFetched} ${pagesFetched === 1 ? "page" : "pages"}`
+                  : results.length > 0
+                    ? `${results.length} found · ${counts.missing} missing · ${counts.installed} installed · ${counts.downloaded} downloaded`
+                    : ""}
+              </span>
+              {searchLoading && <button onClick={handleCancelSearch}>Cancel</button>}
+            </div>
+            {results.length > 0 && <OwnershipFilterBar value={ownershipFilter} onChange={changeOwnershipFilter} />}
+            <button className="toolbar-button" aria-pressed={showHistory} onClick={() => setShowHistory((open) => !open)}>
+              <IconClock />
+              History
+            </button>
+          </div>
+
+          {showHistory && (
+            <HistoryPanel
+              downloading={downloading}
+              outputFolder={outputFolder}
+              onRepair={(jobs) => void startBatch(jobs, true)}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
 
           <ResultsList
             results={visibleResults}
@@ -362,11 +536,23 @@ export default function App() {
             downloadedIds={downloadedIds}
             installedIds={installedIds}
             onToggle={toggleSelected}
-            onToggleAll={toggleSelectAll}
             emptyMessage={emptyResultsMessage}
           />
 
-          <DownloadPanel progress={progress} labels={labels} total={batchTotal} />
+          <DownloadPanel
+            progress={progress}
+            labels={labels}
+            total={batchTotal}
+            downloading={downloading}
+            cancelling={cancelDownloadRequested}
+            retryableCount={retryableCount}
+            onCancel={handleCancelDownload}
+            onRetry={handleRetryFailed}
+            onExport={() => {
+              const ids = [...progress.values()].filter((event) => event.status === "error" || event.status === "cancelled").map((event) => event.beatmapsetId);
+              void window.api.exportFailedIds(ids).catch((error) => setAppError(errorMessage(error, "Could not export IDs.")));
+            }}
+          />
         </main>
       </div>
     </div>

@@ -1,6 +1,8 @@
 // Flat JSON "already downloaded" tracker, kept next to the output folder.
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { displayPath, isMissingFile, isRecord, writeJsonAtomic } from "../json-file";
+import type { DownloadHistoryEntry } from "../../shared/types";
 
 interface ManifestEntry {
   downloadedAt: string;
@@ -18,11 +20,34 @@ function manifestPath(outDir: string): string {
   return path.join(outDir, ".beatmap-downloader-manifest.json");
 }
 
+export function parseManifest(value: unknown): Manifest {
+  if (!isRecord(value)) return {};
+  const manifest: Manifest = {};
+  for (const [id, entry] of Object.entries(value)) {
+    const numericId = Number(id);
+    if (
+      !Number.isSafeInteger(numericId) ||
+      numericId <= 0 ||
+      !isRecord(entry) ||
+      typeof entry["downloadedAt"] !== "string" ||
+      typeof entry["path"] !== "string"
+    ) {
+      continue;
+    }
+    manifest[id] = { downloadedAt: entry["downloadedAt"], path: entry["path"] };
+  }
+  return manifest;
+}
+
 export async function loadManifest(outDir: string): Promise<Manifest> {
+  const filePath = manifestPath(outDir);
   try {
-    const raw = await fs.readFile(manifestPath(outDir), "utf-8");
-    return JSON.parse(raw) as Manifest;
-  } catch {
+    const raw = await fs.readFile(filePath, "utf8");
+    return parseManifest(JSON.parse(raw));
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      console.warn(`[manifest] could not read ${displayPath(filePath)}; rebuilding it`);
+    }
     return {};
   }
 }
@@ -33,7 +58,7 @@ export async function recordDownload(outDir: string, beatmapsetId: number, fileP
   const current = previous.catch(() => undefined).then(async () => {
     const manifest = await loadManifest(outDir);
     manifest[String(beatmapsetId)] = { downloadedAt: new Date().toISOString(), path: filePath };
-    await fs.writeFile(target, JSON.stringify(manifest, null, 2), "utf-8");
+    await writeJsonAtomic(target, manifest);
   });
 
   pendingWrites.set(target, current);
@@ -46,9 +71,18 @@ export async function recordDownload(outDir: string, beatmapsetId: number, fileP
 }
 
 export async function listDownloadedIds(outDir: string): Promise<number[]> {
+  return (await listDownloadHistory(outDir)).filter((entry) => entry.exists).map((entry) => entry.beatmapsetId).sort((a, b) => a - b);
+}
+
+export async function listDownloadHistory(outDir: string): Promise<DownloadHistoryEntry[]> {
   const manifest = await loadManifest(outDir);
-  return Object.keys(manifest)
-    .map(Number)
-    .filter((id) => Number.isSafeInteger(id) && id > 0)
-    .sort((left, right) => left - right);
+  const files = new Set((await fs.readdir(outDir, { withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => entry.name.toLowerCase()));
+  return Object.entries(manifest).map(([id, entry]) => {
+    const name = path.basename(entry.path);
+    return {
+      beatmapsetId: Number(id), downloadedAt: entry.downloadedAt,
+      fileName: name.replace(/^\d+\s*/, "").replace(/\.osz$/i, ""),
+      path: path.join(outDir, name), exists: files.has(name.toLowerCase()),
+    };
+  }).sort((a, b) => b.downloadedAt.localeCompare(a.downloadedAt));
 }
