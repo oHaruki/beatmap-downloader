@@ -142,7 +142,8 @@ export async function findDefaultOsuFolder(): Promise<OsuFolderSelection | null>
     for (const base of [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]]) {
       if (base) candidates.push(path.join(base, "osu!"));
     }
-    // ponytail: only probes X:\osu!, add a shallow drive scan if installs in deeper folders are missed.
+    // Only probes X:\osu! on each drive. If installs in deeper folders turn out
+    // to be missed, add a shallow drive scan here.
     for (const letter of "CDEFGHIJKLMNOPQRSTUVWXYZ") candidates.push(`${letter}:\\osu!`);
   }
   for (const candidate of new Set(candidates)) {

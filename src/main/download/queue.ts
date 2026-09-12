@@ -114,6 +114,15 @@ export async function runDownloadQueue(
       let lastReportedStep = -1;
       const result = await download(job.beatmapsetId, temporaryPath, {
         signal: options.signal,
+        onWaiting(seconds) {
+          lastReportedStep = -1;
+          options.onProgress({
+            beatmapsetId: job.beatmapsetId,
+            status: "downloading",
+            progressPercent: null,
+            message: `mirrors busy, retrying in ${seconds}s`,
+          });
+        },
         onProgress(received, total) {
           if (!total) return;
           const step = Math.floor((received / total) * 20);

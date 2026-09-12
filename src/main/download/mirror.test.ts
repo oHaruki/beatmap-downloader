@@ -100,7 +100,9 @@ describe("downloadFromMirrorToFile", () => {
          ? new Response("limited", { status: 429, headers: { "retry-after": "2" } })
          : new Response(archive),
      };
-     await downloadFromMirrorToFile(1, destination, {}, deps);
+     const announced: number[] = [];
+     await downloadFromMirrorToFile(1, destination, { onWaiting: (s) => announced.push(s) }, deps);
+     assert.deepEqual(announced, [2], "the wait is announced so the batch does not look frozen");
      assert.equal(calls, 2);
      assert.deepEqual(waits, [2000]);
      calls = 0;
