@@ -25,6 +25,7 @@ import {
 
 const PAGE_DELAY_MS = 150;
 const LARGE_BATCH_SIZE = 100;
+const PROGRESS_FLUSH_MS = 50;
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -118,14 +119,33 @@ export default function App() {
     return () => window.removeEventListener("focus", onFocus);
   }, [osuFolder, songsFolder, outputFolder, downloading]);
 
-  useEffect(
-    () =>
-      window.api.onDownloadProgress((event) => {
-        setProgress((previous) => new Map(previous).set(event.beatmapsetId, event));
-        if (event.status === "done") setDownloadedIds((previous) => new Set(previous).add(event.beatmapsetId));
-      }),
-    [],
-  );
+  useEffect(() => {
+    // Every map reports several events, and whole-batch bursts (queued, cancelled) arrive back
+    // to back. Copying the progress map once per event is quadratic in the batch size, so
+    // collect events and commit them together.
+    let pending: DownloadProgressEvent[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const flush = (): void => {
+      timer = undefined;
+      const events = pending;
+      pending = [];
+      setProgress((previous) => {
+        const next = new Map(previous);
+        for (const event of events) next.set(event.beatmapsetId, event);
+        return next;
+      });
+      const done = events.filter((event) => event.status === "done").map((event) => event.beatmapsetId);
+      if (done.length > 0) setDownloadedIds((previous) => new Set([...previous, ...done]));
+    };
+    const unsubscribe = window.api.onDownloadProgress((event) => {
+      pending.push(event);
+      timer ??= setTimeout(flush, PROGRESS_FLUSH_MS);
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
+  }, []);
 
   async function refreshInstalledIds(osuRoot: string, songs: string): Promise<void> {
     if (installedScanRef.current) return;
@@ -344,10 +364,6 @@ export default function App() {
 
   async function startBatch(jobs: DownloadJob[], force = forceRedownload): Promise<void> {
     if (!outputFolder || jobs.length === 0 || downloading) return;
-    if (jobs.length > 1_000) {
-      setDownloadError("A batch can contain at most 1,000 beatmapsets. Select fewer maps and try again.");
-      return;
-    }
     if (
       jobs.length >= LARGE_BATCH_SIZE &&
       !window.confirm(`Download ${jobs.length.toLocaleString()} beatmapsets? This may take a while.`)
