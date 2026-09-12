@@ -49,4 +49,12 @@ test("resolveOsuFolder", async (t) => {
 
     await assert.rejects(resolveOsuFolder(root), /contains osu!\.exe/);
   });
+
+  await t.test("rejects an osu!lazer install found through its shortcut", async (t) => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "beatmap-downloader-lazer-"));
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    await fs.writeFile(path.join(root, "osu!.exe"), "");
+
+    await assert.rejects(resolveOsuFolder(root), /Songs folder/);
+  });
 });

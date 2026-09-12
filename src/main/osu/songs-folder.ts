@@ -123,9 +123,27 @@ export async function findDefaultOsuFolder(): Promise<OsuFolderSelection | null>
         candidates.unshift(path.dirname(expanded));
       }
     } catch { /* No registered osu! protocol; try common install locations. */ }
+    // Start Menu/Desktop shortcuts still point at installs moved to another
+    // drive. Lazer shortcuts resolve too but fail the Songs check below.
+    // Loaded lazily so tests can import this module outside Electron.
+    const { app, shell } = await import("electron");
+    const shortcutDirs = [
+      path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs"),
+      path.join(process.env.ProgramData ?? "C:\\ProgramData", "Microsoft", "Windows", "Start Menu", "Programs"),
+      app.getPath("desktop"),
+    ];
+    for (const dir of shortcutDirs) {
+      for (const name of await fs.readdir(dir).catch(() => [] as string[])) {
+        if (!/^osu.*\.lnk$/i.test(name)) continue;
+        try { candidates.push(path.dirname(shell.readShortcutLink(path.join(dir, name)).target)); }
+        catch { /* Broken shortcut. */ }
+      }
+    }
     for (const base of [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]]) {
       if (base) candidates.push(path.join(base, "osu!"));
     }
+    // ponytail: only probes X:\osu!, add a shallow drive scan if installs in deeper folders are missed.
+    for (const letter of "CDEFGHIJKLMNOPQRSTUVWXYZ") candidates.push(`${letter}:\\osu!`);
   }
   for (const candidate of new Set(candidates)) {
     try { return await resolveOsuFolder(candidate); }
