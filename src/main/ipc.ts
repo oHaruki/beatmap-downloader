@@ -206,6 +206,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   });
 
   ipcMain.handle("choose-osu-folder", async () => {
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
     const win = getWindow();
     if (!win) return null;
     const current = await loadOsuFolderSelection();
@@ -217,6 +218,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     const selection = await resolveOsuFolder(result.filePaths[0]);
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
     await setOsuFolderSelection(selection);
     return selection;
   });

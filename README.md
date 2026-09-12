@@ -105,7 +105,10 @@ renderer processes, runs the test suite, and verifies a production build.
   Beatconnect), since osu.ppy.sh requires a real logged-in session for
   direct downloads. Files are streamed to temporary `.part` files and only
   moved into place after validation, so an interrupted download cannot look
-  complete. Failed or cancelled items can be retried from the download panel.
+  complete. Validation checks ZIP entries, decompression sizes, and CRC checksums,
+  requires a nonempty `.osu` entry, and limits expanded content to 4 GB. Mirror
+  cooldowns are waited out with up to three retries per file; Cancel also stops
+  these waits. Failed or cancelled items can be retried from the download panel.
 - Choose the osu! installation folder that contains `osu!.exe`; the app resolves
   its configured `Songs` directory automatically for ownership checks and
   imports. Maps you already have are detected and skipped automatically.
