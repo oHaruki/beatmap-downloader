@@ -11,6 +11,8 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { InstalledSongsScan, OsuFolderSelection } from "@shared/types";
 import { readOsuDb } from "./osu-db";
 
@@ -111,11 +113,25 @@ export async function resolveOsuFolder(selectedFolder: string): Promise<OsuFolde
 }
 
 export async function findDefaultOsuFolder(): Promise<OsuFolderSelection | null> {
-  try {
-    return await resolveOsuFolder(path.join(localAppDataDir(), "osu!"));
-  } catch {
-    return null;
+  const candidates = [path.join(localAppDataDir(), "osu!")];
+  if (process.platform === "win32") {
+    try {
+      const { stdout } = await promisify(execFile)("reg.exe", ["query", "HKCR\\osu\\shell\\open\\command", "/ve"], { windowsHide: true, timeout: 1500 });
+      const executable = /REG_(?:EXPAND_)?SZ\s+"?(.+?\.exe)(?:"|\s|$)/i.exec(stdout)?.[1];
+      if (executable) {
+        const expanded = executable.replace(/%([^%]+)%/g, (_, name: string) => process.env[name] ?? `%${name}%`);
+        candidates.unshift(path.dirname(expanded));
+      }
+    } catch { /* No registered osu! protocol; try common install locations. */ }
+    for (const base of [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]]) {
+      if (base) candidates.push(path.join(base, "osu!"));
+    }
   }
+  for (const candidate of new Set(candidates)) {
+    try { return await resolveOsuFolder(candidate); }
+    catch { /* Try the next installation. */ }
+  }
+  return null;
 }
 
 // osu!.db lives in the install root, which is NOT reliably the parent of the

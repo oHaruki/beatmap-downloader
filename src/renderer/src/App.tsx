@@ -412,6 +412,13 @@ export default function App() {
       <TitleBar />
       {showSettings && (
         <SettingsModal
+          onFolderChanged={(selection) => {
+            setOsuFolder(selection?.osuFolder ?? null);
+            setSongsFolder(selection?.songsFolder ?? null);
+            setInstalledIds(new Set());
+            setInstalledSource(null);
+            if (selection) void refreshInstalledIds(selection.osuFolder, selection.songsFolder);
+          }}
           firstRun={settingsFirstRun}
           onClose={() => setShowSettings(false)}
           onSaved={() => {

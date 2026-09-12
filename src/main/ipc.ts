@@ -11,7 +11,6 @@ import {
   verifyApiCredentials,
 } from "./osu/api";
 import {
-  findDefaultOsuFolder,
   listInstalledBeatmapsets,
   resolveOsuFolder,
 } from "./osu/songs-folder";
@@ -22,6 +21,7 @@ import { listDownloadedIds, listDownloadHistory } from "./download/manifest";
 import { getDefaultDownloadsFolder, loadConfig, saveConfig } from "./config";
 import { isRecord } from "./json-file";
 import { getCredentials, getCredentialSettings, storeCredentials, forgetCredentials } from "./credentials";
+import { loadOsuFolderSelection, getOsuFolderSettings, setOsuFolderSettings, setOsuFolderSelection } from "./osu/folder-settings";
 
 const MAX_BATCH_JOBS = 1_000;
 const MAX_INSTALLED_IDS = 2_000_000;
@@ -94,35 +94,6 @@ async function configuredOutputFolder(requested: unknown): Promise<string> {
   const configured = config.outputFolder ?? getDefaultDownloadsFolder();
   if (!samePath(requestedFolder, configured)) throw new TypeError("The output folder is not configured.");
   return configured;
-}
-
-async function loadOsuFolderSelection(): Promise<OsuFolderSelection | null> {
-  const config = await loadConfig();
-  const candidates = [
-    config.osuFolder,
-    config.songsFolder ? path.dirname(config.songsFolder) : null,
-  ].filter((candidate): candidate is string => Boolean(candidate));
-
-  for (const candidate of candidates) {
-    try {
-      const selection = await resolveOsuFolder(candidate);
-      if (
-        !config.osuFolder ||
-        !config.songsFolder ||
-        !samePath(config.osuFolder, selection.osuFolder) ||
-        !samePath(config.songsFolder, selection.songsFolder)
-      ) {
-        await saveConfig(selection);
-      }
-      return selection;
-    } catch {
-      // Try the detected default before asking the user to choose again.
-    }
-  }
-
-  const detected = await findDefaultOsuFolder();
-  if (detected) await saveConfig(detected);
-  return detected;
 }
 
 async function configuredOsuFolders(
@@ -227,6 +198,12 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   });
 
   ipcMain.handle("get-osu-folder", () => loadOsuFolderSelection());
+  ipcMain.handle("get-osu-folder-settings", () => getOsuFolderSettings());
+  ipcMain.handle("set-osu-folder-settings", async (_event, value: unknown) => {
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
+    if (!isRecord(value) || typeof value.remember !== "boolean" || typeof value.autoDetect !== "boolean") throw new Error("Folder preferences are invalid.");
+    return setOsuFolderSettings({ remember: value.remember, autoDetect: value.autoDetect });
+  });
 
   ipcMain.handle("choose-osu-folder", async () => {
     const win = getWindow();
@@ -240,7 +217,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     const selection = await resolveOsuFolder(result.filePaths[0]);
-    await saveConfig(selection);
+    await setOsuFolderSelection(selection);
     return selection;
   });
 

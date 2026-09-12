@@ -10,8 +10,6 @@ import type { SearchPreset } from "../shared/types";
 
 export interface AppConfig {
   outputFolder: string | null;
-  osuFolder: string | null;
-  songsFolder: string | null;
   osuApiClientId: string | null;
   osuApiClientSecret: string | null;
   autoImportEnabled: boolean;
@@ -20,8 +18,6 @@ export interface AppConfig {
 
 const DEFAULT_CONFIG: AppConfig = {
   outputFolder: null,
-  osuFolder: null,
-  songsFolder: null,
   osuApiClientId: null,
   osuApiClientSecret: null,
   autoImportEnabled: false,
@@ -52,8 +48,6 @@ export function parseAppConfig(value: unknown): AppConfig {
   if (!isRecord(value)) return { ...DEFAULT_CONFIG };
   return {
     outputFolder: nullableString(value["outputFolder"]),
-    osuFolder: nullableString(value["osuFolder"]),
-    songsFolder: nullableString(value["songsFolder"]),
     searchPresets: Array.isArray(value["searchPresets"]) ? value["searchPresets"].flatMap((preset) => {
       if (!isRecord(preset) || typeof preset["name"] !== "string" || !preset["name"].trim()) return [];
       const filters = parseSearchFilters(preset["filters"]);

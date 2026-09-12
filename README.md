@@ -56,6 +56,25 @@ remain supported. Saving through the new Settings removes the legacy plaintext
 credentials from that portable config. A user-managed `.env` is not modified.
 Saved search presets remain in the portable `config.json`.
 
+### Remember or automatically find osu!
+
+Settings has two independent, opt-in folder preferences:
+
+- **Remember my osu! folder on this PC** restores the selected installation on
+  the next launch, even after replacing the portable build.
+- **Find osu! automatically at launch** checks the registered osu! installation
+  and common Windows install locations when no remembered installation is
+  available. It reads osu!'s configuration to locate custom Songs directories.
+
+Click **Save folder preferences**; no API credentials are needed to save these
+options. **Choose folder** accepts the installation folder or its standard
+Songs folder. With both options off, your selection lasts only for the session.
+Turning off Remember removes the stored path, while keeping the current
+session's selection. Folder preferences are stored in
+`%APPDATA%\beatmap-downloader\folders.json`; this file is removed when both
+options are disabled. Previous portable configs' folder paths are no longer
+loaded automatically: select your installation once and opt in to remembering it.
+
 Windows will likely warn about an unknown publisher, since the exe is not
 code signed.
 
