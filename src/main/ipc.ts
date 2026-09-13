@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DownloadJob, DownloadProgressEvent, OsuFolderSelection } from "@shared/types";
 import { parseSearchFilters, validateSearchFilters } from "@shared/search-filters";
+import { enabledMirrorTemplates, isMirrorId, parseDisabledMirrors } from "@shared/mirrors";
 import { isBareIdKind, MAX_LINK_TEXT_LENGTH, parseBeatmapLinks } from "@shared/beatmap-links";
 import {
   hasApiCredentials,
@@ -21,6 +22,7 @@ import {
 import { executeImportPlan, planAutoImport, type ImportOutcome } from "./osu/auto-import-executor";
 import { importPlanForFile } from "./osu/auto-import";
 import { runDownloadQueue } from "./download/queue";
+import { downloadFromMirrorToFile } from "./download/mirror";
 import { listDownloadedIds, listDownloadHistory } from "./download/manifest";
 import { getDefaultDownloadsFolder, loadConfig, saveConfig } from "./config";
 import { isRecord } from "./json-file";
@@ -246,6 +248,17 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return enabled;
   });
 
+  ipcMain.handle("get-disabled-mirrors", async () => (await loadConfig()).disabledMirrors);
+  ipcMain.handle("set-mirror-enabled", async (_event, id: unknown, enabled: unknown) => {
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
+    if (!isMirrorId(id) || typeof enabled !== "boolean") throw new TypeError("Mirror setting is invalid.");
+    const current = (await loadConfig()).disabledMirrors;
+    const requested = enabled ? current.filter((mirror) => mirror !== id) : [...current, id];
+    const disabled = parseDisabledMirrors(requested);
+    if (disabled.length !== new Set(requested).size) throw new Error("Keep at least one mirror enabled.");
+    return (await saveConfig({ disabledMirrors: disabled })).disabledMirrors;
+  });
+
   ipcMain.handle("has-api-credentials", () => hasApiCredentials());
   ipcMain.handle("get-credential-settings", () => getCredentialSettings());
   ipcMain.handle("forget-api-credentials", async () => { await forgetCredentials(); resetTokenCache(); });
@@ -335,6 +348,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       const win = getWindow();
       const config = await loadConfig();
       const importContext = config.autoImportEnabled ? await buildAutoImportContext() : null;
+      const mirrors = enabledMirrorTemplates(config.disabledMirrors);
       const controller = new AbortController();
       activeDownloadController = controller;
 
@@ -354,6 +368,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
                 return result.message || undefined;
               }
             : undefined,
+        }, {
+          download: (beatmapsetId, destination, options) =>
+            downloadFromMirrorToFile(beatmapsetId, destination, options, { mirrors }),
         });
         return { done: true } as const;
       } finally {

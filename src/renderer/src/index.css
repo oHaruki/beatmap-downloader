@@ -1534,6 +1534,20 @@ input[type="checkbox"]:disabled {
   border-top: 1px solid var(--border);
 }
 
+.mirror-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.mirror-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
 .folder-location {
   margin: 0;
   color: var(--text-dim);

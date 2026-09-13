@@ -110,6 +110,8 @@ renderer processes, runs the test suite, and verifies a production build.
   requires a nonempty `.osu` entry, and limits expanded content to 4 GB. Mirror
   cooldowns are waited out with up to three retries per file; Cancel also stops
   these waits. Failed or cancelled items can be retried from the download panel.
+  Mirrors can be switched off under **Settings > Download mirrors**. All of
+  them are on by default and at least one has to stay on.
 - Choose the osu! installation folder that contains `osu!.exe`; the app resolves
   its configured `Songs` directory automatically for ownership checks and
   imports. Maps you already have are detected and skipped automatically.

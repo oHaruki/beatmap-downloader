@@ -1,3 +1,5 @@
+import type { MirrorId } from "./mirrors";
+
 export type BeatmapStatus =
   | "any"
   | "ranked"
@@ -144,6 +146,9 @@ export interface RendererApi {
   exportFailedIds: (ids: number[]) => Promise<boolean>;
   resolveBeatmapLinks: (text: string, bareIds: "set" | "beatmap") => Promise<LinkResolveResult>;
   cancelLinkLookup: () => Promise<boolean>;
+  getDisabledMirrors: () => Promise<MirrorId[]>;
+  /** Resolves to the mirrors that are switched off after the change. */
+  setMirrorEnabled: (id: MirrorId, enabled: boolean) => Promise<MirrorId[]>;
   startDownload: (
     jobs: DownloadJob[],
     outDir: string,

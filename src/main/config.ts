@@ -5,6 +5,7 @@ import { app } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { displayPath, isMissingFile, isRecord, writeJsonAtomic } from "./json-file";
+import { parseDisabledMirrors, type MirrorId } from "../shared/mirrors";
 import { parseSearchFilters, validateSearchFilters } from "../shared/search-filters";
 import type { SearchPreset } from "../shared/types";
 
@@ -14,6 +15,7 @@ export interface AppConfig {
   osuApiClientSecret: string | null;
   autoImportEnabled: boolean;
   searchPresets: SearchPreset[];
+  disabledMirrors: MirrorId[];
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -22,6 +24,7 @@ const DEFAULT_CONFIG: AppConfig = {
   osuApiClientSecret: null,
   autoImportEnabled: false,
   searchPresets: [],
+  disabledMirrors: [],
 };
 
 function configDir(): string {
@@ -59,6 +62,7 @@ export function parseAppConfig(value: unknown): AppConfig {
       typeof value["autoImportEnabled"] === "boolean"
         ? value["autoImportEnabled"]
         : DEFAULT_CONFIG.autoImportEnabled,
+    disabledMirrors: parseDisabledMirrors(value["disabledMirrors"]),
   };
 }
 

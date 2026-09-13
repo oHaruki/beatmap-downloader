@@ -1,15 +1,9 @@
 import { promises as fs } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
+import { enabledMirrorTemplates } from "../../shared/mirrors";
 import { validateArchive } from "./validate-archive";
 
-const DEFAULT_MIRRORS = [
-  "https://api.nerinyan.moe/d/{id}",
-  "https://catboy.best/d/{id}",
-  "https://osu.direct/api/d/{id}",
-  "https://beatconnect.io/b/{id}",
-  // No rate limit, but a smaller graveyard catalogue, so it is the last resort.
-  "https://mirror.nekoha.moe/api/download/{id}",
-] as const;
+const DEFAULT_MIRRORS = enabledMirrorTemplates([]);
 
 // Bump alongside package.json on every release.
 const USER_AGENT = "beatmap-downloader/0.4.1 (+https://github.com/oHaruki/beatmap-downloader)";
