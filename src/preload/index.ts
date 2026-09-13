@@ -45,6 +45,8 @@ const api: RendererApi = {
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
   revealDownload: (id) => ipcRenderer.invoke("reveal-download", id),
   exportFailedIds: (ids) => ipcRenderer.invoke("export-failed-ids", ids),
+  resolveBeatmapLinks: (text) => ipcRenderer.invoke("resolve-beatmap-links", text),
+  cancelLinkLookup: () => ipcRenderer.invoke("cancel-link-lookup"),
 
   startDownload: (
     jobs: DownloadJob[],

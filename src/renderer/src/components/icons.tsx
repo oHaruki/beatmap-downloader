@@ -25,6 +25,13 @@ export const IconClock = (p: SVGProps<SVGSVGElement>) => (
   </Base>
 );
 
+export const IconLink = (p: SVGProps<SVGSVGElement>) => (
+  <Base {...p}>
+    <path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-.9.9" />
+    <path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l.9-.9" />
+  </Base>
+);
+
 export const IconPlay = (p: SVGProps<SVGSVGElement>) => (
   <Base {...p}>
     <path d="M5.5 3.8v8.4L12 8z" fill="currentColor" />

@@ -15,7 +15,8 @@ import { ResultsList } from "./components/ResultsList";
 import { SettingsModal } from "./components/SettingsModal";
 import { TitleBar } from "./components/TitleBar";
 import { HistoryPanel } from "./components/HistoryPanel";
-import { IconClock } from "./components/icons";
+import { LinksPanel } from "./components/LinksPanel";
+import { IconClock, IconLink } from "./components/icons";
 import {
   applyResultsFilter,
   countByOwnership,
@@ -74,6 +75,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsFirstRun, setSettingsFirstRun] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showLinks, setShowLinks] = useState(false);
 
   useEffect(() => {
     void window.api
@@ -531,11 +533,25 @@ export default function App() {
               {searchLoading && <button onClick={handleCancelSearch}>Cancel</button>}
             </div>
             {results.length > 0 && <OwnershipFilterBar value={ownershipFilter} onChange={changeOwnershipFilter} />}
+            <button className="toolbar-button" aria-pressed={showLinks} onClick={() => setShowLinks((open) => !open)}>
+              <IconLink />
+              Paste links
+            </button>
             <button className="toolbar-button" aria-pressed={showHistory} onClick={() => setShowHistory((open) => !open)}>
               <IconClock />
               History
             </button>
           </div>
+
+          {showLinks && (
+            <LinksPanel
+              downloading={downloading}
+              canDownload={Boolean(outputFolder)}
+              forceRedownload={forceRedownload}
+              onDownload={(jobs) => void startBatch(jobs)}
+              onClose={() => setShowLinks(false)}
+            />
+          )}
 
           {showHistory && (
             <HistoryPanel

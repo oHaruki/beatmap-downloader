@@ -78,6 +78,13 @@ export interface DownloadJob {
   fileName: string;
 }
 
+export interface LinkResolveResult {
+  jobs: DownloadJob[];
+  /** Links that could not become a download, shown to the user. */
+  problems: string[];
+  cancelled?: boolean;
+}
+
 export interface DownloadProgressEvent {
   beatmapsetId: number;
   status: DownloadStatus;
@@ -135,6 +142,8 @@ export interface RendererApi {
   getDownloadHistory: () => Promise<DownloadHistoryEntry[]>;
   revealDownload: (id: number) => Promise<void>;
   exportFailedIds: (ids: number[]) => Promise<boolean>;
+  resolveBeatmapLinks: (text: string) => Promise<LinkResolveResult>;
+  cancelLinkLookup: () => Promise<boolean>;
   startDownload: (
     jobs: DownloadJob[],
     outDir: string,

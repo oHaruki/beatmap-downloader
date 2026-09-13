@@ -3,13 +3,17 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DownloadJob, DownloadProgressEvent, OsuFolderSelection } from "@shared/types";
 import { parseSearchFilters, validateSearchFilters } from "@shared/search-filters";
+import { MAX_LINK_TEXT_LENGTH, parseBeatmapLinks } from "@shared/beatmap-links";
 import {
   hasApiCredentials,
+  lookupBeatmaps,
+  lookupBeatmapsetName,
   OsuApiError,
   resetTokenCache,
   searchBeatmapsets,
   verifyApiCredentials,
 } from "./osu/api";
+import { resolveBeatmapLinks } from "./osu/resolve-links";
 import {
   listInstalledBeatmapsets,
   resolveOsuFolder,
@@ -27,6 +31,7 @@ const MAX_INSTALLED_IDS = 2_000_000;
 
 let activeSearchController: AbortController | null = null;
 let activeDownloadController: AbortController | null = null;
+let activeLinkController: AbortController | null = null;
 
 interface AutoImportContext {
   run: (file: string) => Promise<ImportOutcome>;
@@ -272,6 +277,27 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     const result = await dialog.showSaveDialog(win, { title: "Export unfinished beatmap IDs", defaultPath: "unfinished-beatmaps.txt", filters: [{ name: "Text", extensions: ["txt"] }] });
     if (result.canceled || !result.filePath) return false;
     await fs.writeFile(result.filePath, ids.join("\n") + "\n", "utf8");
+    return true;
+  });
+
+  ipcMain.handle("resolve-beatmap-links", async (_event, text: unknown) => {
+    if (typeof text !== "string" || text.length > MAX_LINK_TEXT_LENGTH) throw new TypeError("The pasted links are invalid.");
+    activeLinkController?.abort();
+    const controller = new AbortController();
+    activeLinkController = controller;
+    try {
+      return await resolveBeatmapLinks(parseBeatmapLinks(text).refs, { lookupBeatmaps, lookupBeatmapsetName }, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted || isAbortError(error)) return { jobs: [], problems: [], cancelled: true };
+      throw error;
+    } finally {
+      if (activeLinkController === controller) activeLinkController = null;
+    }
+  });
+
+  ipcMain.handle("cancel-link-lookup", () => {
+    if (!activeLinkController) return false;
+    activeLinkController.abort();
     return true;
   });
 

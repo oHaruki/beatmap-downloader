@@ -1171,6 +1171,48 @@ input[type="checkbox"]:disabled {
   font-size: 11.5px;
 }
 
+/* --- download from links --- */
+
+.links-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.links-panel > p.meta {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.links-input {
+  min-height: 96px;
+  max-height: 240px;
+  resize: vertical;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.links-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.links-input::placeholder {
+  color: var(--text-dim);
+}
+
 /* --- download panel --- */
 
 .download-panel {
