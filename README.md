@@ -125,10 +125,12 @@ renderer processes, runs the test suite, and verifies a production build.
   together with its downloads preserves file detection.
 - **Paste links** downloads a list of maps without searching, for example a
   mappool. Paste osu! beatmapset links, difficulty links (`/b/`, `/beatmaps/`,
-  `#osu/`) or plain beatmapset IDs, one per line or mixed into other text such
-  as a spreadsheet row. Difficulty links are resolved to their set through the
-  osu! API, and duplicates are merged. A file written by **Export unfinished
-  IDs** can be pasted straight back in.
+  `#osu/`) or plain IDs, one per line or mixed into other text such as a
+  spreadsheet row. A plain number cannot say whether it is a difficulty or a
+  set, so pick which one your list uses: **Difficulty IDs** for mappool sheets,
+  **Set IDs** for a file written by **Export unfinished IDs**. Difficulty links
+  and IDs are resolved to their set through the osu! API, and duplicates are
+  merged.
 - **Show file** reveals a downloaded archive in Explorer. **Export unfinished
   IDs** saves failed or cancelled beatmapset IDs as a text file.
 - The parsed `osu!.db` is reused until the file changes; the Songs directory is

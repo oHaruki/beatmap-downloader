@@ -1189,6 +1189,13 @@ input[type="checkbox"]:disabled {
   overflow-wrap: anywhere;
 }
 
+.links-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .links-input {
   min-height: 96px;
   max-height: 240px;

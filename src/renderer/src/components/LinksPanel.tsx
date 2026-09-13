@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DownloadJob } from "@shared/types";
-import { parseBeatmapLinks } from "@shared/beatmap-links";
+import { isBareIdKind, parseBeatmapLinks, type BareIdKind } from "@shared/beatmap-links";
 import { IconClose } from "./icons";
+
+const BARE_ID_KEY = "links.bareIds";
+const BARE_ID_OPTIONS: Array<{ value: BareIdKind; label: string; title: string }> = [
+  { value: "beatmap", label: "Difficulty IDs", title: "A number on its own line is a difficulty ID, like mappool sheets use (osu.ppy.sh/b/...)" },
+  { value: "set", label: "Set IDs", title: "A number on its own line is a beatmapset ID, like Export unfinished IDs writes (osu.ppy.sh/s/...)" },
+];
+
+function loadBareIdKind(): BareIdKind {
+  try {
+    const saved = localStorage.getItem(BARE_ID_KEY);
+    return isBareIdKind(saved) ? saved : "beatmap";
+  } catch {
+    return "beatmap";
+  }
+}
 
 export function LinksPanel({ downloading, canDownload, forceRedownload, onDownload, onClose }: {
   downloading: boolean;
@@ -13,8 +28,9 @@ export function LinksPanel({ downloading, canDownload, forceRedownload, onDownlo
   const [text, setText] = useState("");
   const [looking, setLooking] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
+  const [bareIds, setBareIds] = useState<BareIdKind>(loadBareIdKind);
   const mounted = useRef(true);
-  const parsed = useMemo(() => parseBeatmapLinks(text), [text]);
+  const parsed = useMemo(() => parseBeatmapLinks(text, bareIds), [text, bareIds]);
   const count = parsed.refs.length;
 
   useEffect(() => {
@@ -29,7 +45,7 @@ export function LinksPanel({ downloading, canDownload, forceRedownload, onDownlo
     setLooking(true);
     setProblems([]);
     try {
-      const result = await window.api.resolveBeatmapLinks(text);
+      const result = await window.api.resolveBeatmapLinks(text, bareIds);
       if (!mounted.current || result.cancelled) return;
       setProblems(result.problems);
       if (result.jobs.length === 0) return;
@@ -40,6 +56,11 @@ export function LinksPanel({ downloading, canDownload, forceRedownload, onDownlo
     } finally {
       if (mounted.current) setLooking(false);
     }
+  }
+
+  function changeBareIds(value: BareIdKind): void {
+    setBareIds(value);
+    try { localStorage.setItem(BARE_ID_KEY, value); } catch { /* only a convenience */ }
   }
 
   const summary = count === 0
@@ -70,10 +91,28 @@ export function LinksPanel({ downloading, canDownload, forceRedownload, onDownlo
       placeholder={"https://osu.ppy.sh/beatmapsets/39804#osu/129891\nhttps://osu.ppy.sh/b/129891\n39804"}
       aria-label="Beatmap links"
     />
+    <div className="links-options">
+      <span className="meta">Plain numbers are</span>
+      <div className="segmented" role="group" aria-label="What plain numbers mean">
+        {BARE_ID_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            className={option.value === bareIds ? "active" : undefined}
+            aria-pressed={option.value === bareIds}
+            title={option.title}
+            type="button"
+            disabled={looking}
+            onClick={() => changeBareIds(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
     <p className="meta">
       {looking
         ? "Looking up maps on osu!…"
-        : `Paste set links, difficulty links or beatmapset IDs, one per line or mixed with other text. ${forceRedownload ? "Maps you already have are downloaded again." : "Maps you already have are skipped."}`}
+        : `Paste set links, difficulty links or IDs, one per line or mixed with other text. Links always work, plain numbers follow the choice above. ${forceRedownload ? "Maps you already have are downloaded again." : "Maps you already have are skipped."}`}
     </p>
     {skipped > 0 && !looking && (
       <p className="meta" title={parsed.unrecognized.join("\n")}>

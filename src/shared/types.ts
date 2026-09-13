@@ -142,7 +142,7 @@ export interface RendererApi {
   getDownloadHistory: () => Promise<DownloadHistoryEntry[]>;
   revealDownload: (id: number) => Promise<void>;
   exportFailedIds: (ids: number[]) => Promise<boolean>;
-  resolveBeatmapLinks: (text: string) => Promise<LinkResolveResult>;
+  resolveBeatmapLinks: (text: string, bareIds: "set" | "beatmap") => Promise<LinkResolveResult>;
   cancelLinkLookup: () => Promise<boolean>;
   startDownload: (
     jobs: DownloadJob[],

@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DownloadJob, DownloadProgressEvent, OsuFolderSelection } from "@shared/types";
 import { parseSearchFilters, validateSearchFilters } from "@shared/search-filters";
-import { MAX_LINK_TEXT_LENGTH, parseBeatmapLinks } from "@shared/beatmap-links";
+import { isBareIdKind, MAX_LINK_TEXT_LENGTH, parseBeatmapLinks } from "@shared/beatmap-links";
 import {
   hasApiCredentials,
   lookupBeatmaps,
@@ -280,13 +280,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return true;
   });
 
-  ipcMain.handle("resolve-beatmap-links", async (_event, text: unknown) => {
+  ipcMain.handle("resolve-beatmap-links", async (_event, text: unknown, bareIds: unknown) => {
     if (typeof text !== "string" || text.length > MAX_LINK_TEXT_LENGTH) throw new TypeError("The pasted links are invalid.");
+    if (!isBareIdKind(bareIds)) throw new TypeError("The ID type is invalid.");
     activeLinkController?.abort();
     const controller = new AbortController();
     activeLinkController = controller;
     try {
-      return await resolveBeatmapLinks(parseBeatmapLinks(text).refs, { lookupBeatmaps, lookupBeatmapsetName }, controller.signal);
+      return await resolveBeatmapLinks(parseBeatmapLinks(text, bareIds).refs, { lookupBeatmaps, lookupBeatmapsetName }, controller.signal);
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) return { jobs: [], problems: [], cancelled: true };
       throw error;

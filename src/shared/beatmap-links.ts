@@ -1,6 +1,5 @@
 // Pulls beatmap references out of pasted text: osu! links in any of their
-// usual shapes, or lines holding nothing but a beatmapset ID (the format
-// "Export unfinished IDs" writes).
+// usual shapes, or lines holding nothing but an ID.
 
 export interface BeatmapLinkRef {
   /** "set" ids can be downloaded directly, "beatmap" ids name one difficulty
@@ -8,6 +7,12 @@ export interface BeatmapLinkRef {
   kind: "set" | "beatmap";
   id: number;
 }
+
+/** What a bare number means. A number alone cannot tell a difficulty from a
+ *  set, and guessing wrong downloads a different map or none at all, so the
+ *  user picks. Mappool sheets list difficulty IDs, "Export unfinished IDs"
+ *  writes set IDs. */
+export type BareIdKind = BeatmapLinkRef["kind"];
 
 export interface ParsedBeatmapLinks {
   refs: BeatmapLinkRef[];
@@ -55,7 +60,11 @@ function refFromLink(link: string): BeatmapLinkRef | null {
   }
 }
 
-export function parseBeatmapLinks(text: string): ParsedBeatmapLinks {
+export function isBareIdKind(value: unknown): value is BareIdKind {
+  return value === "set" || value === "beatmap";
+}
+
+export function parseBeatmapLinks(text: string, bareIds: BareIdKind): ParsedBeatmapLinks {
   const refs: BeatmapLinkRef[] = [];
   const unrecognized: string[] = [];
   const seen = new Set<string>();
@@ -75,7 +84,7 @@ export function parseBeatmapLinks(text: string): ParsedBeatmapLinks {
     // for maps.
     const bareId = parseId(line);
     if (bareId) {
-      add({ kind: "set", id: bareId });
+      add({ kind: bareIds, id: bareId });
       continue;
     }
 
