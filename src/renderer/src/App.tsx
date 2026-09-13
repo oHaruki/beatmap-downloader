@@ -429,6 +429,10 @@ export default function App() {
       : selectedRemaining === selected.size
         ? `Download ${selected.size} selected`
         : `Download ${selectedRemaining} of ${selected.size}`;
+  // A batch started without a search (pasted links, history repair) has
+  // nothing to share the main area with, so it takes the space the empty
+  // results hint would otherwise fill.
+  const batchInMainArea = results.length === 0 && !searchLoading && batchTotal > 0;
   const emptyResultsMessage = results.length > 0
     ? "No maps match the selected ownership filter."
     : hasCompletedSearch
@@ -562,16 +566,19 @@ export default function App() {
             />
           )}
 
-          <ResultsList
-            results={visibleResults}
-            selected={selected}
-            downloadedIds={downloadedIds}
-            installedIds={installedIds}
-            onToggle={toggleSelected}
-            emptyMessage={emptyResultsMessage}
-          />
+          {!batchInMainArea && (
+            <ResultsList
+              results={visibleResults}
+              selected={selected}
+              downloadedIds={downloadedIds}
+              installedIds={installedIds}
+              onToggle={toggleSelected}
+              emptyMessage={emptyResultsMessage}
+            />
+          )}
 
           <DownloadPanel
+            expandedJobs={batchInMainArea ? lastBatchJobs : undefined}
             progress={progress}
             labels={labels}
             total={batchTotal}

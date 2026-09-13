@@ -1,4 +1,7 @@
-import type { DownloadProgressEvent } from "@shared/types";
+import type { DownloadJob, DownloadProgressEvent } from "@shared/types";
+
+// Rows past this stay out of the DOM; progress re-renders the list every 50 ms.
+const MAX_BATCH_ROWS = 500;
 
 interface Props {
   progress: Map<number, DownloadProgressEvent>;
@@ -10,6 +13,26 @@ interface Props {
   onCancel: () => void;
   onRetry: () => void;
   onExport: () => void;
+  /** Fill the main area with every map of the batch, used when there are no
+   *  search results to share the space with (link downloads, repairs). */
+  expandedJobs?: DownloadJob[];
+}
+
+function statusText(event: DownloadProgressEvent | undefined): string {
+  switch (event?.status) {
+    case "downloading":
+      return event.progressPercent != null ? `${event.progressPercent}%` : (event.message ?? "starting");
+    case "done":
+      return event.message ? `done, ${event.message}` : `done${event.mirror ? ` via ${event.mirror}` : ""}`;
+    case "skipped":
+      return event.message ?? "skipped";
+    case "error":
+      return `failed: ${event.message ?? "unknown error"}`;
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "queued";
+  }
 }
 
 export function DownloadPanel({
@@ -22,6 +45,7 @@ export function DownloadPanel({
   onCancel,
   onRetry,
   onExport,
+  expandedJobs,
 }: Props) {
   if (total === 0) return null;
 
@@ -40,7 +64,7 @@ export function DownloadPanel({
   }
 
   return (
-    <section className="download-panel" aria-label="Downloads">
+    <section className={`download-panel${expandedJobs ? " expanded" : ""}`} aria-label="Downloads">
       <div className="download-head">
         <strong>{downloading ? (cancelling ? "Cancelling…" : "Downloading") : "Last batch"}</strong>
         <div className="download-summary">
@@ -81,44 +105,74 @@ export function DownloadPanel({
         <div className="progress-bar-fill" style={{ width: `${(finished / total) * 100}%` }} />
       </div>
 
-      {active.length > 0 && (
-        <div className="active-downloads">
-          {active.map((event) => (
-            <div key={event.beatmapsetId} className="active-download-row">
-              <div className="progress-name-row">
-                <span className="progress-name">
-                  {labels.get(event.beatmapsetId) ?? event.beatmapsetId}
-                </span>
-                <span className="progress-percent">
-                  {event.progressPercent != null ? `${event.progressPercent}%` : (event.message ?? "")}
-                </span>
+      {expandedJobs ? (
+        <div className="batch-list">
+          {expandedJobs.slice(0, MAX_BATCH_ROWS).map((job) => {
+            const event = progress.get(job.beatmapsetId);
+            const status = event?.status ?? "queued";
+            return (
+              <div key={job.beatmapsetId} className={`batch-row ${status}${event?.message && status === "done" ? " warning" : ""}`}>
+                <div className="progress-name-row">
+                  <span className="progress-name">{labels.get(job.beatmapsetId) ?? job.fileName}</span>
+                  <span className="progress-percent" title={statusText(event)}>{statusText(event)}</span>
+                </div>
+                {status === "downloading" && (
+                  <div className={`progress-bar-track${event?.progressPercent == null ? " indeterminate" : ""}`}>
+                    <div
+                      className="progress-bar-fill"
+                      style={event?.progressPercent != null ? { width: `${event.progressPercent}%` } : undefined}
+                    />
+                  </div>
+                )}
               </div>
-              <div className={`progress-bar-track${event.progressPercent == null ? " indeterminate" : ""}`}>
-                <div
-                  className="progress-bar-fill"
-                  style={
-                    event.progressPercent != null ? { width: `${event.progressPercent}%` } : undefined
-                  }
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
+          {expandedJobs.length > MAX_BATCH_ROWS && (
+            <p className="meta">{(expandedJobs.length - MAX_BATCH_ROWS).toLocaleString()} more maps not listed</p>
+          )}
         </div>
-      )}
+      ) : (
+        <>
+          {active.length > 0 && (
+            <div className="active-downloads">
+              {active.map((event) => (
+                <div key={event.beatmapsetId} className="active-download-row">
+                  <div className="progress-name-row">
+                    <span className="progress-name">
+                      {labels.get(event.beatmapsetId) ?? event.beatmapsetId}
+                    </span>
+                    <span className="progress-percent">
+                      {event.progressPercent != null ? `${event.progressPercent}%` : (event.message ?? "")}
+                    </span>
+                  </div>
+                  <div className={`progress-bar-track${event.progressPercent == null ? " indeterminate" : ""}`}>
+                    <div
+                      className="progress-bar-fill"
+                      style={
+                        event.progressPercent != null ? { width: `${event.progressPercent}%` } : undefined
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-      {(warnings.length > 0 || errors.length > 0) && (
-        <div className="message-rows">
-          {warnings.map((event) => (
-            <div key={`warning-${event.beatmapsetId}`} className="warning-row">
-              {labels.get(event.beatmapsetId) ?? event.beatmapsetId}: {event.message}
+          {(warnings.length > 0 || errors.length > 0) && (
+            <div className="message-rows">
+              {warnings.map((event) => (
+                <div key={`warning-${event.beatmapsetId}`} className="warning-row">
+                  {labels.get(event.beatmapsetId) ?? event.beatmapsetId}: {event.message}
+                </div>
+              ))}
+              {errors.map((event) => (
+                <div key={`error-${event.beatmapsetId}`} className="error-row">
+                  {labels.get(event.beatmapsetId) ?? event.beatmapsetId}: {event.message}
+                </div>
+              ))}
             </div>
-          ))}
-          {errors.map((event) => (
-            <div key={`error-${event.beatmapsetId}`} className="error-row">
-              {labels.get(event.beatmapsetId) ?? event.beatmapsetId}: {event.message}
-            </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {mirrors.size > 0 && (

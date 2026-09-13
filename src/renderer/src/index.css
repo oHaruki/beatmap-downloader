@@ -1235,6 +1235,59 @@ input[type="checkbox"]:disabled {
   background: var(--panel);
 }
 
+.download-panel.expanded {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.batch-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -12px;
+  padding: 0 12px;
+}
+
+.batch-row {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--panel-alt);
+}
+
+.batch-row .progress-name-row {
+  margin-bottom: 0;
+}
+
+.batch-row .progress-bar-track {
+  margin-top: 5px;
+}
+
+.batch-row.queued .progress-name,
+.batch-row.skipped .progress-name,
+.batch-row.cancelled .progress-name {
+  color: var(--text-dim);
+}
+
+.batch-row.done .progress-percent {
+  color: var(--good);
+}
+
+.batch-row.warning .progress-percent {
+  color: var(--warn);
+}
+
+.batch-row.error .progress-percent {
+  color: var(--bad);
+}
+
+.batch-row .progress-percent {
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .download-head {
   display: flex;
   align-items: center;
