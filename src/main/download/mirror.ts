@@ -4,7 +4,11 @@ import { validateArchive } from "./validate-archive";
 
 const DEFAULT_MIRRORS = [
   "https://api.nerinyan.moe/d/{id}",
+  "https://catboy.best/d/{id}",
+  "https://osu.direct/api/d/{id}",
   "https://beatconnect.io/b/{id}",
+  // No rate limit, but a smaller graveyard catalogue, so it is the last resort.
+  "https://mirror.nekoha.moe/api/download/{id}",
 ] as const;
 
 // Bump alongside package.json on every release.
