@@ -3,13 +3,18 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DownloadJob, DownloadProgressEvent, OsuFolderSelection } from "@shared/types";
 import { parseSearchFilters, validateSearchFilters } from "@shared/search-filters";
+import { enabledMirrorTemplates, isMirrorId, parseDisabledMirrors } from "@shared/mirrors";
+import { isBareIdKind, MAX_LINK_TEXT_LENGTH, parseBeatmapLinks } from "@shared/beatmap-links";
 import {
   hasApiCredentials,
+  lookupBeatmaps,
+  lookupBeatmapsetName,
   OsuApiError,
   resetTokenCache,
   searchBeatmapsets,
   verifyApiCredentials,
 } from "./osu/api";
+import { resolveBeatmapLinks } from "./osu/resolve-links";
 import {
   listInstalledBeatmapsets,
   resolveOsuFolder,
@@ -17,6 +22,7 @@ import {
 import { executeImportPlan, planAutoImport, type ImportOutcome } from "./osu/auto-import-executor";
 import { importPlanForFile } from "./osu/auto-import";
 import { runDownloadQueue } from "./download/queue";
+import { downloadFromMirrorToFile } from "./download/mirror";
 import { listDownloadedIds, listDownloadHistory } from "./download/manifest";
 import { getDefaultDownloadsFolder, loadConfig, saveConfig } from "./config";
 import { isRecord } from "./json-file";
@@ -27,6 +33,7 @@ const MAX_INSTALLED_IDS = 2_000_000;
 
 let activeSearchController: AbortController | null = null;
 let activeDownloadController: AbortController | null = null;
+let activeLinkController: AbortController | null = null;
 
 interface AutoImportContext {
   run: (file: string) => Promise<ImportOutcome>;
@@ -241,6 +248,17 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return enabled;
   });
 
+  ipcMain.handle("get-disabled-mirrors", async () => (await loadConfig()).disabledMirrors);
+  ipcMain.handle("set-mirror-enabled", async (_event, id: unknown, enabled: unknown) => {
+    if (activeDownloadController) throw new Error("Wait for the current download batch to finish.");
+    if (!isMirrorId(id) || typeof enabled !== "boolean") throw new TypeError("Mirror setting is invalid.");
+    const current = (await loadConfig()).disabledMirrors;
+    const requested = enabled ? current.filter((mirror) => mirror !== id) : [...current, id];
+    const disabled = parseDisabledMirrors(requested);
+    if (disabled.length !== new Set(requested).size) throw new Error("Keep at least one mirror enabled.");
+    return (await saveConfig({ disabledMirrors: disabled })).disabledMirrors;
+  });
+
   ipcMain.handle("has-api-credentials", () => hasApiCredentials());
   ipcMain.handle("get-credential-settings", () => getCredentialSettings());
   ipcMain.handle("forget-api-credentials", async () => { await forgetCredentials(); resetTokenCache(); });
@@ -272,6 +290,28 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     const result = await dialog.showSaveDialog(win, { title: "Export unfinished beatmap IDs", defaultPath: "unfinished-beatmaps.txt", filters: [{ name: "Text", extensions: ["txt"] }] });
     if (result.canceled || !result.filePath) return false;
     await fs.writeFile(result.filePath, ids.join("\n") + "\n", "utf8");
+    return true;
+  });
+
+  ipcMain.handle("resolve-beatmap-links", async (_event, text: unknown, bareIds: unknown) => {
+    if (typeof text !== "string" || text.length > MAX_LINK_TEXT_LENGTH) throw new TypeError("The pasted links are invalid.");
+    if (!isBareIdKind(bareIds)) throw new TypeError("The ID type is invalid.");
+    activeLinkController?.abort();
+    const controller = new AbortController();
+    activeLinkController = controller;
+    try {
+      return await resolveBeatmapLinks(parseBeatmapLinks(text, bareIds).refs, { lookupBeatmaps, lookupBeatmapsetName }, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted || isAbortError(error)) return { jobs: [], problems: [], cancelled: true };
+      throw error;
+    } finally {
+      if (activeLinkController === controller) activeLinkController = null;
+    }
+  });
+
+  ipcMain.handle("cancel-link-lookup", () => {
+    if (!activeLinkController) return false;
+    activeLinkController.abort();
     return true;
   });
 
@@ -308,6 +348,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       const win = getWindow();
       const config = await loadConfig();
       const importContext = config.autoImportEnabled ? await buildAutoImportContext() : null;
+      const mirrors = enabledMirrorTemplates(config.disabledMirrors);
       const controller = new AbortController();
       activeDownloadController = controller;
 
@@ -327,6 +368,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
                 return result.message || undefined;
               }
             : undefined,
+        }, {
+          download: (beatmapsetId, destination, options) =>
+            downloadFromMirrorToFile(beatmapsetId, destination, options, { mirrors }),
         });
         return { done: true } as const;
       } finally {

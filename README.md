@@ -19,11 +19,11 @@ This is a very early build, put together quickly. If something breaks or
 looks wrong, please open an issue on the
 [Issues page](https://github.com/oHaruki/beatmap-downloader/issues).
 
-The mirrors this relies on (Nerinyan, Beatconnect) are
-community-run, not something this project controls. They can be slow, rate
-limit you, or go down for a while. The app backs off and falls back between
-them, but if both are having a bad day at once, downloads will fail
-until they recover.
+The mirrors this relies on (Nerinyan, catboy.best, osu.direct, Beatconnect,
+mirror.nekoha.moe) are community-run, not something this project controls.
+They can be slow, rate limit you, or go down for a while. The app backs off and
+falls back between them, but if all of them are having a bad day at once,
+downloads will fail until they recover.
 
 ## Quick start
 
@@ -102,13 +102,16 @@ renderer processes, runs the test suite, and verifies a production build.
 - Searches keep loading pages until every matching map has been found. You can
   cancel a broad search without losing the results already loaded.
 - The actual `.osz` files come from a mirror cascade (Nerinyan, then
-  Beatconnect), since osu.ppy.sh requires a real logged-in session for
+  catboy.best, osu.direct, Beatconnect and finally mirror.nekoha.moe), since
+  osu.ppy.sh requires a real logged-in session for
   direct downloads. Files are streamed to temporary `.part` files and only
   moved into place after validation, so an interrupted download cannot look
   complete. Validation checks ZIP entries, decompression sizes, and CRC checksums,
   requires a nonempty `.osu` entry, and limits expanded content to 4 GB. Mirror
   cooldowns are waited out with up to three retries per file; Cancel also stops
   these waits. Failed or cancelled items can be retried from the download panel.
+  Mirrors can be switched off under **Settings > Download mirrors**. All of
+  them are on by default and at least one has to stay on.
 - Choose the osu! installation folder that contains `osu!.exe`; the app resolves
   its configured `Songs` directory automatically for ownership checks and
   imports. Maps you already have are detected and skipped automatically.
@@ -122,6 +125,14 @@ renderer processes, runs the test suite, and verifies a production build.
   archives still exist. Re-download missing files without having to search for
   them again, even if the maps are already installed. Moving the portable folder
   together with its downloads preserves file detection.
+- **Paste links** downloads a list of maps without searching, for example a
+  mappool. Paste osu! beatmapset links, difficulty links (`/b/`, `/beatmaps/`,
+  `#osu/`) or plain IDs, one per line or mixed into other text such as a
+  spreadsheet row. A plain number cannot say whether it is a difficulty or a
+  set, so pick which one your list uses: **Difficulty IDs** for mappool sheets,
+  **Set IDs** for a file written by **Export unfinished IDs**. Difficulty links
+  and IDs are resolved to their set through the osu! API, and duplicates are
+  merged.
 - **Show file** reveals a downloaded archive in Explorer. **Export unfinished
   IDs** saves failed or cancelled beatmapset IDs as a text file.
 - The parsed `osu!.db` is reused until the file changes; the Songs directory is

@@ -1171,6 +1171,55 @@ input[type="checkbox"]:disabled {
   font-size: 11.5px;
 }
 
+/* --- download from links --- */
+
+.links-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.links-panel > p.meta {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.links-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.links-input {
+  min-height: 96px;
+  max-height: 240px;
+  resize: vertical;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.links-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.links-input::placeholder {
+  color: var(--text-dim);
+}
+
 /* --- download panel --- */
 
 .download-panel {
@@ -1184,6 +1233,59 @@ input[type="checkbox"]:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.download-panel.expanded {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.batch-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -12px;
+  padding: 0 12px;
+}
+
+.batch-row {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--panel-alt);
+}
+
+.batch-row .progress-name-row {
+  margin-bottom: 0;
+}
+
+.batch-row .progress-bar-track {
+  margin-top: 5px;
+}
+
+.batch-row.queued .progress-name,
+.batch-row.skipped .progress-name,
+.batch-row.cancelled .progress-name {
+  color: var(--text-dim);
+}
+
+.batch-row.done .progress-percent {
+  color: var(--good);
+}
+
+.batch-row.warning .progress-percent {
+  color: var(--warn);
+}
+
+.batch-row.error .progress-percent {
+  color: var(--bad);
+}
+
+.batch-row .progress-percent {
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .download-head {
@@ -1430,6 +1532,20 @@ input[type="checkbox"]:disabled {
   margin-top: 4px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
+}
+
+.mirror-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.mirror-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
 }
 
 .folder-location {

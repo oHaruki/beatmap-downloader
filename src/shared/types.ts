@@ -1,3 +1,5 @@
+import type { MirrorId } from "./mirrors";
+
 export type BeatmapStatus =
   | "any"
   | "ranked"
@@ -78,6 +80,13 @@ export interface DownloadJob {
   fileName: string;
 }
 
+export interface LinkResolveResult {
+  jobs: DownloadJob[];
+  /** Links that could not become a download, shown to the user. */
+  problems: string[];
+  cancelled?: boolean;
+}
+
 export interface DownloadProgressEvent {
   beatmapsetId: number;
   status: DownloadStatus;
@@ -135,6 +144,11 @@ export interface RendererApi {
   getDownloadHistory: () => Promise<DownloadHistoryEntry[]>;
   revealDownload: (id: number) => Promise<void>;
   exportFailedIds: (ids: number[]) => Promise<boolean>;
+  resolveBeatmapLinks: (text: string, bareIds: "set" | "beatmap") => Promise<LinkResolveResult>;
+  cancelLinkLookup: () => Promise<boolean>;
+  getDisabledMirrors: () => Promise<MirrorId[]>;
+  /** Resolves to the mirrors that are switched off after the change. */
+  setMirrorEnabled: (id: MirrorId, enabled: boolean) => Promise<MirrorId[]>;
   startDownload: (
     jobs: DownloadJob[],
     outDir: string,

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconClose } from "./icons";
 import type { OsuFolderSelection, OsuFolderSettings } from "@shared/types";
+import { MIRRORS, type MirrorId } from "@shared/mirrors";
 
 interface Props {
   onClose: () => void;
@@ -25,6 +26,9 @@ export function SettingsModal({ onClose, onSaved, firstRun, downloading, onFolde
   const [folderSaving, setFolderSaving] = useState(false);
   const [folderMessage, setFolderMessage] = useState("");
   const [folderError, setFolderError] = useState("");
+  const [disabledMirrors, setDisabledMirrors] = useState<MirrorId[] | null>(null);
+  const [mirrorSaving, setMirrorSaving] = useState(false);
+  const [mirrorError, setMirrorError] = useState("");
 
   useEffect(() => {
     dialog.current?.showModal();
@@ -33,6 +37,8 @@ export function SettingsModal({ onClose, onSaved, firstRun, downloading, onFolde
       setFolder(selection);
     }).catch(() => setFolderError("Could not read osu! folder preferences."))
       .finally(() => setFolderLoading(false));
+    void window.api.getDisabledMirrors().then(setDisabledMirrors)
+      .catch(() => setMirrorError("Could not read mirror settings."));
     void window.api.getCredentialSettings().then((settings) => {
       setClientId(settings.clientId);
       setHasSecret(settings.hasSecret);
@@ -51,6 +57,13 @@ export function SettingsModal({ onClose, onSaved, firstRun, downloading, onFolde
       if (!choose) setFolderMessage(selection ? "Folder preferences saved." : folderSettings.autoDetect ? "Preferences saved. No installation found; choose your osu! folder manually." : "Preferences saved. Choose a folder to use during this session.");
     } catch (error) { setFolderError(error instanceof Error ? error.message : "Could not save folder preferences."); }
     finally { setFolderSaving(false); }
+  }
+
+  async function toggleMirror(id: MirrorId, enabled: boolean): Promise<void> {
+    setMirrorSaving(true); setMirrorError("");
+    try { setDisabledMirrors(await window.api.setMirrorEnabled(id, enabled)); }
+    catch (error) { setMirrorError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : "Could not save mirror settings."); }
+    finally { setMirrorSaving(false); }
   }
 
   async function forget(): Promise<void> {
@@ -167,6 +180,32 @@ export function SettingsModal({ onClose, onSaved, firstRun, downloading, onFolde
           {folderError && <p className="error-text" role="alert">{folderError}</p>}
           </section>
         </div>
+
+        <section className="mirror-settings" aria-labelledby="mirror-settings-title">
+          <strong id="mirror-settings-title" className="modal-section-title">Download mirrors</strong>
+          <div className="mirror-options">
+            {MIRRORS.map((mirror) => {
+              const enabled = disabledMirrors !== null && !disabledMirrors.includes(mirror.id);
+              const lastEnabled = enabled && disabledMirrors.length === MIRRORS.length - 1;
+              return (
+                <label key={mirror.id} className="remember-credentials" title={lastEnabled ? "At least one mirror has to stay on" : new URL(mirror.template).host}>
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    disabled={downloading || disabledMirrors === null || mirrorSaving || lastEnabled}
+                    onChange={(e) => void toggleMirror(mirror.id, e.target.checked)}
+                  />
+                  {mirror.name}
+                </label>
+              );
+            })}
+          </div>
+          <p className="modal-note">
+            Each map is tried on the enabled mirrors from left to right until one has it. Turning off a mirror that is down or slow for you skips the wait on it. At least one has to stay on.
+            {downloading && " Mirrors can be changed once the current batch is done."}
+          </p>
+          {mirrorError && <p className="error-text" role="alert">{mirrorError}</p>}
+        </section>
       </div>
     </dialog>
   );

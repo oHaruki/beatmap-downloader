@@ -45,6 +45,10 @@ const api: RendererApi = {
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
   revealDownload: (id) => ipcRenderer.invoke("reveal-download", id),
   exportFailedIds: (ids) => ipcRenderer.invoke("export-failed-ids", ids),
+  resolveBeatmapLinks: (text, bareIds) => ipcRenderer.invoke("resolve-beatmap-links", text, bareIds),
+  cancelLinkLookup: () => ipcRenderer.invoke("cancel-link-lookup"),
+  getDisabledMirrors: () => ipcRenderer.invoke("get-disabled-mirrors"),
+  setMirrorEnabled: (id, enabled) => ipcRenderer.invoke("set-mirror-enabled", id, enabled),
 
   startDownload: (
     jobs: DownloadJob[],
