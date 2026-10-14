@@ -20,6 +20,7 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
-    "src/renderer/src/results-filter.ts"
+    "src/renderer/src/results-filter.ts",
+    "src/renderer/src/row-window.ts"
   ]
 }
