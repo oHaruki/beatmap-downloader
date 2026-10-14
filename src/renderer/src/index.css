@@ -969,6 +969,8 @@ input[type="checkbox"]:disabled {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Rows are swapped in and out while scrolling; anchoring would fight that. */
+  overflow-anchor: none;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
